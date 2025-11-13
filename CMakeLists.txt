@@ -68,8 +68,8 @@ include(cmake/ios.toolchain.cmake)
 add_compile_definitions(
     PLATFORM_IOS=1
 )
-set(CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "YOUR_TEAM_ID")
-set(PROJECT_ID "dev.net64.game")
+set(CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "88YY3MRVSF")
+set(PROJECT_ID "com.starship.ios")
 endif()
 
 ################################################################################
@@ -383,6 +383,40 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
     )
     target_include_directories(${PROJECT_NAME} PRIVATE
         ${DEVKITPRO}/portlibs/wiiu/include/
+    )
+
+elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # iOS-specific dependencies
+    # Use FetchContent to download and build Ogg and Vorbis for iOS
+    include(FetchContent)
+
+    # Fetch Ogg library first (Vorbis depends on it)
+    FetchContent_Declare(
+        libogg
+        GIT_REPOSITORY https://github.com/xiph/ogg.git
+        GIT_TAG v1.3.5
+    )
+    FetchContent_MakeAvailable(libogg)
+
+    # Set Ogg paths for Vorbis to find
+    set(OGG_INCLUDE_DIR "${libogg_SOURCE_DIR}/include")
+    set(OGG_LIBRARY ogg)
+    set(OGG_LIBRARIES ogg)
+
+    # Fetch Vorbis library
+    FetchContent_Declare(
+        libvorbis
+        GIT_REPOSITORY https://github.com/xiph/vorbis.git
+        GIT_TAG v1.3.7
+    )
+    FetchContent_MakeAvailable(libvorbis)
+
+    set(ADDITIONAL_LIBRARY_DEPENDENCIES
+        "libultraship;"
+        SDL2::SDL2-static
+        ogg
+        vorbis
+        vorbisfile
     )
 
 else() # Linux and others
