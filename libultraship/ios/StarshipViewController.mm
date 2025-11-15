@@ -386,37 +386,14 @@ static const BOOL SHOW_SHOULDER_BUTTONS = NO;
         aButtonTop - smallButtonSize - bButtonGap,   // Above A button
         smallButtonSize, smallButtonSize
     )];
-    // Double-tap Z trigger on press
+    // Simple Z button press with timestamp logging for timing analysis
     barrelRollButton.onPress = ^{
-        if (weakSelf.barrelRollInProgress) return;  // Prevent overlap
-        weakSelf.barrelRollInProgress = YES;
-
-        NSLog(@"[BarrelRoll] Starting sequence");
-
-        // First tap: press Z
-        NSLog(@"[BarrelRoll] First press Z");
+        NSLog(@"[BarrelRoll] Z PRESSED at %.3f", CACurrentMediaTime());
         iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, true);
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            // Release after 0.3s
-            NSLog(@"[BarrelRoll] First release Z");
-            iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
-
-            // Delay 0.2 seconds between taps
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                // Second tap: press Z again
-                NSLog(@"[BarrelRoll] Second press Z");
-                iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, true);
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                    // Final release
-                    NSLog(@"[BarrelRoll] Second release Z - sequence complete");
-                    iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
-                    weakSelf.barrelRollInProgress = NO;
-                });
-            });
-        });
     };
     barrelRollButton.onRelease = ^{
-        // Ignore manual release - sequence handles it
+        NSLog(@"[BarrelRoll] Z RELEASED at %.3f", CACurrentMediaTime());
+        iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
     };
     [self.touchControlsContainer addSubview:barrelRollButton];
 
