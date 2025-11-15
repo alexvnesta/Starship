@@ -669,12 +669,11 @@ static const BOOL SHOW_SHOULDER_BUTTONS = NO;
 
         // Barrel roll detection using pitch attitude angle
         // Get relative pitch angle in degrees (relative to zeroed position)
+        double relativePitch = [[MotionController sharedController] relativePitchDegrees];
+        double rollThreshold = 8.0;  // Threshold: 8 degrees of pitch for barrel roll input
+
         // Only process gyro barrel roll if manual barrel roll button isn't being used
         if (!self.barrelRollInProgress) {
-            double relativePitch = [[MotionController sharedController] relativePitchDegrees];
-
-            // Threshold: 8 degrees of pitch for barrel roll input (more sensitive)
-            double rollThreshold = 8.0;
             if (relativePitch < -rollThreshold) {
                 // Pitched forward -> Z button (roll left)
                 iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, true);
