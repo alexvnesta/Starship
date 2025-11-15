@@ -22,7 +22,8 @@ typedef NS_ENUM(NSInteger, MotionControlMode) {
 @property (nonatomic, assign) CGFloat sensitivity;  // For attitude mode: degrees of tilt for full deflection (default 20.0)
 @property (nonatomic, assign) BOOL invertPitch;
 @property (nonatomic, assign) BOOL invertRoll;
-@property (nonatomic, assign) CGFloat deadzone;    // Deadzone in degrees (default 2.0)
+@property (nonatomic, assign) CGFloat deadzone;    // Deadzone in degrees (default 0.5, small for progressive feel)
+@property (nonatomic, assign) CGFloat responseCurve;  // Response curve exponent: 1.0=linear, 2.0=squared (progressive), 3.0=cubed (default 2.0)
 @property (nonatomic, assign) MotionControlMode mode;  // Current control mode (default: Attitude)
 
 // Singleton instance
@@ -36,8 +37,11 @@ typedef NS_ENUM(NSInteger, MotionControlMode) {
 - (void)recalibrate;
 
 // Get current axis values (-1.0 to 1.0)
-- (CGFloat)axisX;  // Roll (left/right)
-- (CGFloat)axisY;  // Pitch (up/down)
+- (CGFloat)axisX;  // Horizontal (left/right)
+- (CGFloat)axisY;  // Vertical (up/down)
+
+// Get relative pitch angle in degrees (for barrel roll detection)
+- (double)relativePitchDegrees;
 
 // Debug accessors for raw rotation rate (rad/s)
 - (double)rawRotationRateX;
