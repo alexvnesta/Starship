@@ -1,4 +1,5 @@
 // macUtils.mm
+#ifdef __APPLE__
 #include <TargetConditionals.h>
 #if TARGET_OS_OSX
 #import "macUtils.h"
@@ -26,4 +27,5 @@ bool isNativeMacOSFullscreenActive(SDL_Window *window) {
     }
     return false;
 }
-#endif
+#endif // TARGET_OS_OSX
+#endif // __APPLE__
