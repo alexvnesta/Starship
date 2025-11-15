@@ -19,6 +19,9 @@
 // Set to NO when using gyro-based barrel rolls
 static const BOOL SHOW_SHOULDER_BUTTONS = NO;
 
+// Toggle to show/hide gyro debug overlay
+static const BOOL SHOW_GYRO_DEBUG = NO;
+
 // ============================================================================
 // Touch Control Button View
 // Simple button overlay for on-screen controls
@@ -635,24 +638,26 @@ static const BOOL SHOW_SHOULDER_BUTTONS = NO;
     // Calibrate to current device orientation
     [[MotionController sharedController] recalibrate];
 
-    // Create debug label to display gyro values in real-time
-    self.gyroDebugLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 50, 300, 100)];
-    self.gyroDebugLabel.numberOfLines = 0;
-    self.gyroDebugLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightRegular];
-    self.gyroDebugLabel.textColor = [UIColor greenColor];
-    self.gyroDebugLabel.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.8];
-    self.gyroDebugLabel.layer.cornerRadius = 5;
-    self.gyroDebugLabel.clipsToBounds = YES;
-    self.gyroDebugLabel.textAlignment = NSTextAlignmentLeft;
-    self.gyroDebugLabel.userInteractionEnabled = NO;  // Don't block touch events
+    if (SHOW_GYRO_DEBUG) {
+        // Create debug label to display gyro values in real-time
+        self.gyroDebugLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 50, 300, 100)];
+        self.gyroDebugLabel.numberOfLines = 0;
+        self.gyroDebugLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightRegular];
+        self.gyroDebugLabel.textColor = [UIColor greenColor];
+        self.gyroDebugLabel.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.8];
+        self.gyroDebugLabel.layer.cornerRadius = 5;
+        self.gyroDebugLabel.clipsToBounds = YES;
+        self.gyroDebugLabel.textAlignment = NSTextAlignmentLeft;
+        self.gyroDebugLabel.userInteractionEnabled = NO;  // Don't block touch events
 
-    // Add to touch controls container so it appears on the overlay window
-    [self.touchControlsContainer addSubview:self.gyroDebugLabel];
+        // Add to touch controls container so it appears on the overlay window
+        [self.touchControlsContainer addSubview:self.gyroDebugLabel];
 
-    // Bring debug label to front to ensure it's visible
-    [self.touchControlsContainer bringSubviewToFront:self.gyroDebugLabel];
+        // Bring debug label to front to ensure it's visible
+        [self.touchControlsContainer bringSubviewToFront:self.gyroDebugLabel];
 
-    NSLog(@"[MotionController] Debug label created at top-left and added to overlay");
+        NSLog(@"[MotionController] Debug label created at top-left and added to overlay");
+    }
 
     // Create timer to update right analog stick from gyro data at 60Hz
     self.motionUpdateTimer = [NSTimer scheduledTimerWithTimeInterval:1.0/60.0
@@ -719,25 +724,27 @@ static const BOOL SHOW_SHOULDER_BUTTONS = NO;
         }
 
         // Update debug label with current values
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self.gyroDebugLabel.text = [NSString stringWithFormat:
-                @"  GYRO DEBUG (Attitude Assist Mode)  \n"
-                @"Raw (rad/s) X:%+.3f Y:%+.3f Z:%+.3f\n"
-                @"Gyro        X:%+.3f Y:%+.3f%@\n"
-                @"VStick      X:%+.3f Y:%+.3f\n"
-                @"Combined    X:%+.3f Y:%+.3f\n"
-                @"SDL Axis    X:%6d Y:%6d\n"
-                @"Pitch Angle: %+.1f° | Roll Button: %@\n"
-                @"Sensitivity: %.1f°  Enabled: %@",
-                rawX, rawY, rawZ,
-                gyroX, gyroY, (clampedX || clampedY) ? @" CLAMPED!" : @"",
-                self.virtualStickX, self.virtualStickY,
-                combinedX, combinedY,
-                sdlAxisX, sdlAxisY,
-                relativePitch, rollStatus,
-                [[MotionController sharedController] sensitivity],
-                [[MotionController sharedController] enabled] ? @"YES" : @"NO"];
-        });
+        if (SHOW_GYRO_DEBUG) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self.gyroDebugLabel.text = [NSString stringWithFormat:
+                    @"  GYRO DEBUG (Attitude Assist Mode)  \n"
+                    @"Raw (rad/s) X:%+.3f Y:%+.3f Z:%+.3f\n"
+                    @"Gyro        X:%+.3f Y:%+.3f%@\n"
+                    @"VStick      X:%+.3f Y:%+.3f\n"
+                    @"Combined    X:%+.3f Y:%+.3f\n"
+                    @"SDL Axis    X:%6d Y:%6d\n"
+                    @"Pitch Angle: %+.1f° | Roll Button: %@\n"
+                    @"Sensitivity: %.1f°  Enabled: %@",
+                    rawX, rawY, rawZ,
+                    gyroX, gyroY, (clampedX || clampedY) ? @" CLAMPED!" : @"",
+                    self.virtualStickX, self.virtualStickY,
+                    combinedX, combinedY,
+                    sdlAxisX, sdlAxisY,
+                    relativePitch, rollStatus,
+                    [[MotionController sharedController] sensitivity],
+                    [[MotionController sharedController] enabled] ? @"YES" : @"NO"];
+            });
+        }
     }];
 
     NSLog(@"[MotionController] Gyro assist mode initialized - complements virtual stick input");
