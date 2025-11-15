@@ -386,16 +386,33 @@ static const BOOL SHOW_SHOULDER_BUTTONS = NO;
         aButtonTop - smallButtonSize - bButtonGap,   // Above A button
         smallButtonSize, smallButtonSize
     )];
-    // Simple Z button press with timestamp logging for timing analysis
+    // Automatic double-tap Z sequence for barrel roll
+    // Timing based on measured successful barrel rolls: 0.1s press, 0.1s gap, 0.1s press
     barrelRollButton.onPress = ^{
-        weakSelf.barrelRollInProgress = YES;  // Disable gyro barrel roll detection
-        NSLog(@"[BarrelRoll] Z PRESSED at %.3f", CACurrentMediaTime());
+        if (weakSelf.barrelRollInProgress) return;  // Prevent overlap
+        weakSelf.barrelRollInProgress = YES;
+
+        NSLog(@"[BarrelRoll] Starting automatic double-tap sequence");
+
+        // First tap: press Z for 0.1s
         iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, true);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
+
+            // Gap of 0.1s between taps
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                // Second tap: press Z for 0.1s
+                iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, true);
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
+                    weakSelf.barrelRollInProgress = NO;
+                    NSLog(@"[BarrelRoll] Double-tap sequence complete");
+                });
+            });
+        });
     };
     barrelRollButton.onRelease = ^{
-        NSLog(@"[BarrelRoll] Z RELEASED at %.3f", CACurrentMediaTime());
-        iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
-        weakSelf.barrelRollInProgress = NO;  // Re-enable gyro barrel roll detection
+        // Ignore manual release - automatic sequence handles it
     };
     [self.touchControlsContainer addSubview:barrelRollButton];
 
