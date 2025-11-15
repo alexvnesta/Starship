@@ -10,6 +10,7 @@
 #import "StarshipBridge.h"
 #import "MotionController.h"
 #import <GameController/GameController.h>
+#import "libultraship/src/Context.h"
 
 // ============================================================================
 // Touch Control Configuration
@@ -619,6 +620,41 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
     startLabel.font = [UIFont boldSystemFontOfSize:14];
     [startButton addSubview:startLabel];
 
+    // ========================================================================
+    // SETTINGS BUTTON: Top right corner - Opens F1 menu
+    // ========================================================================
+    CGFloat settingsButtonSize = 50;
+    TouchButton *settingsButton = [[TouchButton alloc] initWithFrame:CGRectMake(
+        screenWidth - margin - settingsButtonSize - 10,  // Top-right corner
+        margin + safeAreaInset + 10,
+        settingsButtonSize, settingsButtonSize
+    )];
+    settingsButton.layer.cornerRadius = settingsButtonSize / 2;  // Circular
+    settingsButton.alpha = 0.7;  // Semi-transparent
+    settingsButton.backgroundColor = [[UIColor darkGrayColor] colorWithAlphaComponent:0.8];
+    settingsButton.layer.borderWidth = 2;
+    settingsButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.6].CGColor;
+
+    // Toggle menu visibility on press
+    settingsButton.onPress = ^{
+        // Get the menu bar and toggle its visibility
+        auto gui = Ship::Context::GetInstance()->GetWindow()->GetGui();
+        if (gui && gui->GetMenuBar()) {
+            gui->GetMenuBar()->ToggleVisibility();
+        }
+    };
+    settingsButton.onRelease = ^{
+        // No action needed on release
+    };
+    [self.touchControlsContainer addSubview:settingsButton];
+
+    UILabel *settingsLabel = [[UILabel alloc] initWithFrame:settingsButton.bounds];
+    settingsLabel.text = @"⚙️";  // Gear emoji
+    settingsLabel.textAlignment = NSTextAlignmentCenter;
+    settingsLabel.font = [UIFont systemFontOfSize:28];
+    settingsLabel.userInteractionEnabled = NO;
+    [settingsButton addSubview:settingsLabel];
+
     // Explicitly show touch controls by default
     self.touchControlsContainer.hidden = NO;
     self.touchControlsVisible = YES;
@@ -638,31 +674,39 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
     // Calibrate to current device orientation
     [[MotionController sharedController] recalibrate];
 
-    if (SHOW_GYRO_DEBUG) {
-        // Create debug label to display gyro values in real-time
-        self.gyroDebugLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 50, 300, 100)];
-        self.gyroDebugLabel.numberOfLines = 0;
-        self.gyroDebugLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightRegular];
-        self.gyroDebugLabel.textColor = [UIColor greenColor];
-        self.gyroDebugLabel.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.8];
-        self.gyroDebugLabel.layer.cornerRadius = 5;
-        self.gyroDebugLabel.clipsToBounds = YES;
-        self.gyroDebugLabel.textAlignment = NSTextAlignmentLeft;
-        self.gyroDebugLabel.userInteractionEnabled = NO;  // Don't block touch events
+    // Create debug label to display gyro values in real-time (visibility controlled by CVar)
+    self.gyroDebugLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 50, 300, 100)];
+    self.gyroDebugLabel.numberOfLines = 0;
+    self.gyroDebugLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightRegular];
+    self.gyroDebugLabel.textColor = [UIColor greenColor];
+    self.gyroDebugLabel.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.8];
+    self.gyroDebugLabel.layer.cornerRadius = 5;
+    self.gyroDebugLabel.clipsToBounds = YES;
+    self.gyroDebugLabel.textAlignment = NSTextAlignmentLeft;
+    self.gyroDebugLabel.userInteractionEnabled = NO;  // Don't block touch events
 
-        // Add to touch controls container so it appears on the overlay window
-        [self.touchControlsContainer addSubview:self.gyroDebugLabel];
+    // Add to touch controls container so it appears on the overlay window
+    [self.touchControlsContainer addSubview:self.gyroDebugLabel];
 
-        // Bring debug label to front to ensure it's visible
-        [self.touchControlsContainer bringSubviewToFront:self.gyroDebugLabel];
+    // Bring debug label to front to ensure it's visible
+    [self.touchControlsContainer bringSubviewToFront:self.gyroDebugLabel];
 
-        NSLog(@"[MotionController] Debug label created at top-left and added to overlay");
-    }
+    // Set initial visibility from CVar
+    self.gyroDebugLabel.hidden = !CVarGetInteger("gShowGyroDebug", SHOW_GYRO_DEBUG ? 1 : 0);
+
+    NSLog(@"[MotionController] Debug label created at top-left and added to overlay");
 
     // Create timer to update right analog stick from gyro data at 60Hz
     self.motionUpdateTimer = [NSTimer scheduledTimerWithTimeInterval:1.0/60.0
                                                               repeats:YES
                                                                 block:^(NSTimer *timer) {
+        // Reload gyro settings from CVars (in case they changed via menu)
+        static int frameCounter = 0;
+        if (frameCounter % 60 == 0) {  // Check once per second
+            [[MotionController sharedController] loadSettingsFromCVars];
+        }
+        frameCounter++;
+
         // Get current gyro axis values (-1.0 to 1.0)
         CGFloat gyroX = [[MotionController sharedController] axisX];
         CGFloat gyroY = [[MotionController sharedController] axisY];
@@ -723,8 +767,13 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
             rollStatus = @"R (RIGHT)";
         }
 
-        // Update debug label with current values
-        if (SHOW_GYRO_DEBUG) {
+        // Update debug label with current values (check CVar for visibility)
+        BOOL showDebug = CVarGetInteger("gShowGyroDebug", SHOW_GYRO_DEBUG ? 1 : 0);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.gyroDebugLabel.hidden = !showDebug;
+        });
+
+        if (showDebug) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 self.gyroDebugLabel.text = [NSString stringWithFormat:
                     @"  GYRO DEBUG (Attitude Assist Mode)  \n"

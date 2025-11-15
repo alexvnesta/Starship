@@ -48,6 +48,8 @@ void SetupGuiElements() {
     if (gui->GetMenuBar() && !gui->GetMenuBar()->IsVisible()) {
 #if defined(__SWITCH__) || defined(__WIIU__)
         Notification::Emit({ .message = "Press - to access enhancements menu", .remainingTime = 10.0f });
+#elif defined(__IOS__)
+        Notification::Emit({ .message = "Tap ⚙️ in top-right to access settings menu", .remainingTime = 10.0f });
 #else
         Notification::Emit({ .message = "Press F1 to access enhancements menu", .remainingTime = 10.0f });
 #endif
@@ -347,6 +349,66 @@ void DrawSettingsMenu(){
 
             ImGui::EndMenu();
         }
+
+#ifdef __IOS__
+        UIWidgets::Spacer(0);
+
+        if (UIWidgets::BeginMenu("Mobile Controls")) {
+            ImGui::Text("Touch Controls");
+            UIWidgets::CVarCheckbox("Show Touch Controls", "gShowTouchControls", {
+                .tooltip = "Shows or hides the on-screen touch controls",
+                .defaultValue = true
+            });
+
+            UIWidgets::Spacer(0);
+            ImGui::Separator();
+            UIWidgets::Spacer(0);
+
+            ImGui::Text("Gyro Controls");
+            UIWidgets::CVarCheckbox("Enable Gyro Aiming", "gGyroEnabled", {
+                .tooltip = "Enable or disable gyroscope aiming controls",
+                .defaultValue = true
+            });
+
+            UIWidgets::CVarSliderFloat("Gyro Sensitivity", "gGyroSensitivity", 5.0f, 40.0f, 20.0f, {
+                .tooltip = "Degrees of tilt needed for full stick deflection\n"
+                          "Lower = more sensitive, Higher = less sensitive"
+            });
+
+            UIWidgets::CVarSliderFloat("Gyro Deadzone", "gGyroDeadzone", 0.0f, 5.0f, 0.5f, {
+                .tooltip = "Deadzone in degrees - small movements below this threshold are ignored"
+            });
+
+            UIWidgets::CVarSliderFloat("Gyro Response Curve", "gGyroResponseCurve", 1.0f, 3.0f, 2.0f, {
+                .tooltip = "Response curve for gyro controls\n"
+                          "1.0 = Linear, 2.0 = Squared (progressive), 3.0 = Cubed"
+            });
+
+            UIWidgets::CVarCheckbox("Invert Gyro Pitch", "gGyroInvertPitch", {
+                .tooltip = "Inverts the pitch (up/down) axis for gyro controls",
+                .defaultValue = true
+            });
+
+            UIWidgets::CVarCheckbox("Invert Gyro Roll", "gGyroInvertRoll", {
+                .tooltip = "Inverts the roll (left/right) axis for gyro controls",
+                .defaultValue = true
+            });
+
+            if (UIWidgets::Button("Recalibrate Gyro")) {
+                // TODO: Call recalibration function
+                // [[MotionController sharedController] recalibrate];
+            }
+            UIWidgets::Tooltip("Sets your current device orientation as the neutral position");
+
+            UIWidgets::Spacer(0);
+            UIWidgets::CVarCheckbox("Show Gyro Debug Info", "gShowGyroDebug", {
+                .tooltip = "Shows debug information for gyro controls",
+                .defaultValue = false
+            });
+
+            ImGui::EndMenu();
+        }
+#endif
 
         ImGui::EndMenu();
     }

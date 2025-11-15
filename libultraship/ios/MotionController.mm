@@ -7,6 +7,7 @@
 
 #import "MotionController.h"
 #import <UIKit/UIKit.h>
+#import "libultraship/libultraship.h"
 
 // Conversion factor: radians to degrees
 #define RAD_TO_DEG (180.0 / M_PI)
@@ -76,6 +77,9 @@
         _lastUpdateTime = nil;
 
         NSLog(@"[MotionController] Initialized in Attitude mode - Sensitivity: %.1f degrees for full deflection", _sensitivity);
+
+        // Load settings from CVars
+        [self loadSettingsFromCVars];
     }
     return self;
 }
@@ -139,6 +143,19 @@
                   self.gyroCalibrationX, self.gyroCalibrationY);
         }
     }
+}
+
+- (void)loadSettingsFromCVars {
+    // Load gyro settings from CVars (settings menu)
+    self.enabled = CVarGetInteger("gGyroEnabled", 1);
+    self.sensitivity = CVarGetFloat("gGyroSensitivity", 20.0f);
+    self.deadzone = CVarGetFloat("gGyroDeadzone", 0.5f);
+    self.responseCurve = CVarGetFloat("gGyroResponseCurve", 2.0f);
+    self.invertPitch = CVarGetInteger("gGyroInvertPitch", 1);
+    self.invertRoll = CVarGetInteger("gGyroInvertRoll", 1);
+
+    NSLog(@"[MotionController] Loaded settings from CVars - Enabled: %d, Sensitivity: %.1f, Deadzone: %.2f, Curve: %.1f",
+          self.enabled, self.sensitivity, self.deadzone, self.responseCurve);
 }
 
 - (void)processMotionData:(CMDeviceMotion *)motion {

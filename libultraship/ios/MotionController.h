@@ -36,6 +36,9 @@ typedef NS_ENUM(NSInteger, MotionControlMode) {
 // Recalibration
 - (void)recalibrate;
 
+// Load settings from CVars
+- (void)loadSettingsFromCVars;
+
 // Get current axis values (-1.0 to 1.0)
 - (CGFloat)axisX;  // Horizontal (left/right)
 - (CGFloat)axisY;  // Vertical (up/down)
