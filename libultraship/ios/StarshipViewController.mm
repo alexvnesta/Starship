@@ -242,6 +242,9 @@ static const BOOL SHOW_SHOULDER_BUTTONS = NO;
 // Auto-hold timers for Boost/Brake buttons (3.2 second hold on tap)
 @property (nonatomic, strong) NSTimer *boostHoldTimer;
 @property (nonatomic, strong) NSTimer *brakeHoldTimer;
+
+// Barrel roll sequence tracking
+@property (nonatomic, assign) BOOL barrelRollInProgress;
 @end
 
 @implementation StarshipViewController
@@ -256,6 +259,9 @@ static const BOOL SHOW_SHOULDER_BUTTONS = NO;
     // Initialize virtual stick values
     self.virtualStickX = 0.0;
     self.virtualStickY = 0.0;
+
+    // Initialize barrel roll flag
+    self.barrelRollInProgress = NO;
 
     // Setup touch controls overlay
     [self setupTouchControls];
@@ -373,6 +379,48 @@ static const BOOL SHOW_SHOULDER_BUTTONS = NO;
     bLabel.textColor = [UIColor whiteColor];
     bLabel.font = [UIFont boldSystemFontOfSize:14];
     [bButton addSubview:bLabel];
+
+    // Barrel Roll Button - positioned top-left of A button (opposite of B)
+    TouchButton *barrelRollButton = [[TouchButton alloc] initWithFrame:CGRectMake(
+        aButtonLeft - smallButtonSize - bButtonGap,  // Left of A button
+        aButtonTop - smallButtonSize - bButtonGap,   // Above A button
+        smallButtonSize, smallButtonSize
+    )];
+    // Double-tap Z trigger on press
+    barrelRollButton.onPress = ^{
+        if (weakSelf.barrelRollInProgress) return;  // Prevent overlap
+        weakSelf.barrelRollInProgress = YES;
+
+        // First tap: press Z
+        iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, true);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            // Release after 0.3s
+            iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
+
+            // Delay 0.2 seconds between taps
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                // Second tap: press Z again
+                iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, true);
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    // Final release
+                    iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
+                    weakSelf.barrelRollInProgress = NO;
+                });
+            });
+        });
+    };
+    barrelRollButton.onRelease = ^{
+        // Ignore manual release - sequence handles it
+    };
+    [self.touchControlsContainer addSubview:barrelRollButton];
+
+    UILabel *barrelRollLabel = [[UILabel alloc] initWithFrame:barrelRollButton.bounds];
+    barrelRollLabel.text = @"ZZ\nROLL";
+    barrelRollLabel.numberOfLines = 2;
+    barrelRollLabel.textAlignment = NSTextAlignmentCenter;
+    barrelRollLabel.textColor = [UIColor whiteColor];
+    barrelRollLabel.font = [UIFont boldSystemFontOfSize:14];
+    [barrelRollButton addSubview:barrelRollLabel];
 
     // ========================================================================
     // C-BUTTONS: N64 Star Fox 64 C-button functions
