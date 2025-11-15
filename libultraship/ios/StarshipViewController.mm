@@ -388,12 +388,14 @@ static const BOOL SHOW_SHOULDER_BUTTONS = NO;
     )];
     // Simple Z button press with timestamp logging for timing analysis
     barrelRollButton.onPress = ^{
+        weakSelf.barrelRollInProgress = YES;  // Disable gyro barrel roll detection
         NSLog(@"[BarrelRoll] Z PRESSED at %.3f", CACurrentMediaTime());
         iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, true);
     };
     barrelRollButton.onRelease = ^{
         NSLog(@"[BarrelRoll] Z RELEASED at %.3f", CACurrentMediaTime());
         iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
+        weakSelf.barrelRollInProgress = NO;  // Re-enable gyro barrel roll detection
     };
     [self.touchControlsContainer addSubview:barrelRollButton];
 
@@ -667,22 +669,25 @@ static const BOOL SHOW_SHOULDER_BUTTONS = NO;
 
         // Barrel roll detection using pitch attitude angle
         // Get relative pitch angle in degrees (relative to zeroed position)
-        double relativePitch = [[MotionController sharedController] relativePitchDegrees];
+        // Only process gyro barrel roll if manual barrel roll button isn't being used
+        if (!self.barrelRollInProgress) {
+            double relativePitch = [[MotionController sharedController] relativePitchDegrees];
 
-        // Threshold: 8 degrees of pitch for barrel roll input (more sensitive)
-        double rollThreshold = 8.0;
-        if (relativePitch < -rollThreshold) {
-            // Pitched forward -> Z button (roll left)
-            iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, true);
-            iOS_SetButton(IOS_BUTTON_RIGHTSHOULDER, false);
-        } else if (relativePitch > rollThreshold) {
-            // Pitched backward -> R button (roll right)
-            iOS_SetButton(IOS_BUTTON_RIGHTSHOULDER, true);
-            iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
-        } else {
-            // No roll detected
-            iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
-            iOS_SetButton(IOS_BUTTON_RIGHTSHOULDER, false);
+            // Threshold: 8 degrees of pitch for barrel roll input (more sensitive)
+            double rollThreshold = 8.0;
+            if (relativePitch < -rollThreshold) {
+                // Pitched forward -> Z button (roll left)
+                iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, true);
+                iOS_SetButton(IOS_BUTTON_RIGHTSHOULDER, false);
+            } else if (relativePitch > rollThreshold) {
+                // Pitched backward -> R button (roll right)
+                iOS_SetButton(IOS_BUTTON_RIGHTSHOULDER, true);
+                iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
+            } else {
+                // No roll detected
+                iOS_SetButton(IOS_BUTTON_LEFTSHOULDER, false);
+                iOS_SetButton(IOS_BUTTON_RIGHTSHOULDER, false);
+            }
         }
 
         // Check if we're hitting clamp limits
