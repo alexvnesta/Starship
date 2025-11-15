@@ -40,6 +40,8 @@ cmake-build-*/
 .idea/
 .vs
 build*
+CMakeScripts/
+*.make
 logs/
 /mods/
 starship.cfg.json
