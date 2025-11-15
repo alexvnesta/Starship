@@ -182,7 +182,7 @@
         double rollDegrees = relativeRoll * RAD_TO_DEG;
         double yawDegrees = relativeYaw * RAD_TO_DEG;
 
-        // Map tilt angle to axis value (SWAPPED: yaw→X, roll→Y)
+        // Map tilt angle to axis value (FINAL: yaw→X, roll→Y)
         // sensitivity = degrees needed for full deflection (default 20°)
         CGFloat rawAxisX = (CGFloat)(yawDegrees / self.sensitivity);
         CGFloat rawAxisY = (CGFloat)(rollDegrees / self.sensitivity);
