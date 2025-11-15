@@ -16,6 +16,16 @@ NS_ASSUME_NONNULL_BEGIN
 @interface StarshipViewController : UIViewController
 
 /**
+ * Container view for all touch controls
+ */
+@property (nonatomic, readonly) UIView *touchControlsContainer;
+
+/**
+ * Separate window for touch controls overlay (sits on top of SDL window)
+ */
+@property (nonatomic, strong) UIWindow *overlayWindow;
+
+/**
  * Toggle visibility of on-screen touch controls
  * @param visible YES to show controls, NO to hide (e.g., when physical controller connected)
  */

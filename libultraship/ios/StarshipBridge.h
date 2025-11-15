@@ -55,6 +55,30 @@ void iOS_SetAxis(int axis, short value);
 void iOS_SetCameraState(int axis, float value);
 
 // ============================================================================
+// File Picker Functions
+// ============================================================================
+
+/**
+ * Show iOS file picker and return selected file path
+ * This function blocks until user selects a file or cancels
+ * @param outPath Buffer to store selected path (caller must provide buffer of at least 1024 bytes)
+ * @param pathSize Size of the output buffer
+ * @return true if file was selected, false if cancelled
+ */
+bool iOS_ShowFilePicker(char* outPath, size_t pathSize);
+
+// ============================================================================
+// View Integration Functions
+// ============================================================================
+
+/**
+ * Integrate SDL's window with iOS touch controls
+ * Must be called after SDL window is created
+ * @param sdlWindow Pointer to SDL_Window
+ */
+void iOS_IntegrateSDLView(void* sdlWindow);
+
+// ============================================================================
 // Button Mapping Constants
 // ============================================================================
 // These match SDL_GameControllerButton values for consistency

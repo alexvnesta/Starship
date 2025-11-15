@@ -8,6 +8,9 @@
 #if !defined(__IOS__) && !defined(__ANDROID__) && !defined(__SWITCH__)
 #include "portable-file-dialogs.h"
 #endif
+#ifdef __IOS__
+#include "libultraship/ios/StarshipBridge.h"
+#endif
 
 std::unordered_map<std::string, std::string> mGameList = {
     { "d8b1088520f7c5f81433292a9258c1184afa1457", "Star Fox 64 (U) (V1.0)" },
@@ -23,7 +26,22 @@ std::unordered_map<std::string, std::string> mGameList = {
 };
 
 bool GameExtractor::SelectGameFromUI() {
-#if !defined(__IOS__) && !defined(__ANDROID__) && !defined(__SWITCH__)
+#if defined(__IOS__)
+    SPDLOG_INFO("[Extractor] iOS: Starting ROM selection via file picker");
+    // iOS: Use native file picker
+    char pathBuffer[1024] = {0};
+
+    SPDLOG_INFO("[Extractor] Calling iOS_ShowFilePicker...");
+    if (!iOS_ShowFilePicker(pathBuffer, sizeof(pathBuffer))) {
+        SPDLOG_ERROR("[Extractor] iOS_ShowFilePicker returned false - user cancelled or error");
+        return false;
+    }
+
+    this->mGamePath = std::string(pathBuffer);
+    SPDLOG_INFO("[Extractor] iOS: Selected ROM: {}", this->mGamePath.string());
+
+#elif !defined(__ANDROID__) && !defined(__SWITCH__)
+    // Desktop: Use portable file dialogs
     auto selection = pfd::open_file("Select a file", ".", { "N64 Roms", "*.z64" }).result();
 
     if (selection.empty()) {
@@ -31,13 +49,26 @@ bool GameExtractor::SelectGameFromUI() {
     }
 
     this->mGamePath = selection[0];
+
 #else
+    // Android/Switch: Use hardcoded path (fallback)
     this->mGamePath = Ship::Context::GetPathRelativeToAppDirectory("baserom.us.rev1.z64");
 #endif
 
     std::ifstream file(this->mGamePath, std::ios::binary);
+    if (!file.is_open()) {
+        SPDLOG_ERROR("[Extractor] Failed to open ROM file: {}", this->mGamePath.string());
+        return false;
+    }
+
     this->mGameData = std::vector<uint8_t>( std::istreambuf_iterator( file ), {} );
     file.close();
+
+    if (this->mGameData.empty()) {
+        SPDLOG_ERROR("[Extractor] ROM file is empty or could not be read");
+        return false;
+    }
+
     return true;
 }
 

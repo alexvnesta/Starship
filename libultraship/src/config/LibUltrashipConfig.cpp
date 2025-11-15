@@ -1,4 +1,4 @@
-#include "Config.h"
+#include "LibUltrashipConfig.h"
 
 #include <fstream>
 #include <string>

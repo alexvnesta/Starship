@@ -67,6 +67,7 @@ set(PLATFORM "OS64")
 include(cmake/ios.toolchain.cmake)
 add_compile_definitions(
     PLATFORM_IOS=1
+    __IOS__
 )
 set(CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "88YY3MRVSF")
 set(PROJECT_ID "com.starship.ios")
@@ -178,8 +179,9 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(STORYBOARD_FILE ${IOS_DIR}/Launch.storyboard)
     set(IMAGE_FILES ${IOS_DIR}/PoweredBy.png)
     set(ICON_FILES ${IOS_DIR}/Icon.png)
+    set(O2R_FILES ${CMAKE_CURRENT_SOURCE_DIR}/sf64.o2r ${CMAKE_CURRENT_SOURCE_DIR}/starship.o2r)
 
-    list(APPEND ALL_FILES ${STORYBOARD_FILE} ${IMAGE_FILES} ${ICON_FILES})
+    list(APPEND ALL_FILES ${STORYBOARD_FILE} ${IMAGE_FILES} ${ICON_FILES} ${O2R_FILES})
 
     add_executable(${PROJECT_NAME} ${ALL_FILES})
     set_xcode_property(${PROJECT_NAME} PRODUCT_BUNDLE_IDENTIFIER ${PROJECT_ID} All)
@@ -188,7 +190,20 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
         PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_INFO_PLIST ${IOS_DIR}/plist.in
+        MACOSX_BUNDLE_GUI_IDENTIFIER ${PROJECT_ID}
+        MACOSX_BUNDLE_BUNDLE_NAME "Starship"
         RESOURCE "${IMAGE_FILES};${STORYBOARD_FILE};${ICON_FILES}"
+    )
+
+    # Add custom command to copy O2R files to the app bundle
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/sf64.o2r
+            $<TARGET_FILE_DIR:${PROJECT_NAME}>/sf64.o2r
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/starship.o2r
+            $<TARGET_FILE_DIR:${PROJECT_NAME}>/starship.o2r
+        COMMENT "Copying O2R files to app bundle"
     )
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     add_library(${PROJECT_NAME} SHARED ${ALL_FILES})

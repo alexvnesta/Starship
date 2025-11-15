@@ -1,5 +1,6 @@
 // macUtils.mm
-#ifdef __APPLE__
+#include <TargetConditionals.h>
+#if TARGET_OS_OSX
 #import "macUtils.h"
 #import <SDL_syswm.h>
 #import <Cocoa/Cocoa.h>

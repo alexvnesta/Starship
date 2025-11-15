@@ -3,7 +3,7 @@
 #include <functional>
 #include "utils/filesystemtools/DiskFile.h"
 #include <utils/Utils.h>
-#include "config/Config.h"
+#include "config/LibUltrashipConfig.h"
 #include "Context.h"
 
 #ifdef _MSC_VER

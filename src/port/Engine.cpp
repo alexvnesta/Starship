@@ -119,6 +119,18 @@ GameEngine::GameEngine() {
     const std::string appDir = (sdlInternal && *sdlInternal) ? std::string(sdlInternal) : std::string(".");
     const std::string main_path = appDir + "/sf64.o2r";
     const std::string assets_path = appDir + "/starship.o2r";
+#elif defined(__IOS__)
+    // On iOS, O2R files are bundled in the app bundle
+    char* basePath = SDL_GetBasePath();
+    const std::string appDir = basePath ? std::string(basePath) : std::string(".");
+    if (basePath) {
+        SDL_free(basePath);
+    }
+    const std::string main_path = appDir + "sf64.o2r";
+    const std::string assets_path = appDir + "starship.o2r";
+    SPDLOG_INFO("[iOS] App bundle path: {}", appDir);
+    SPDLOG_INFO("[iOS] Looking for main O2R at: {}", main_path);
+    SPDLOG_INFO("[iOS] Looking for assets O2R at: {}", assets_path);
 #else
     const std::string main_path = Ship::Context::GetPathRelativeToAppDirectory("sf64.o2r");
     const std::string assets_path = Ship::Context::LocateFileAcrossAppDirs("starship.o2r");
@@ -147,13 +159,53 @@ GameEngine::GameEngine() {
     // On Android, always wait for the user to select the file through the UI first
     extern void waitForSetupFromNative();
     waitForSetupFromNative();
-    
+
     // After waiting, check if the file exists
     if (std::filesystem::exists(main_path)) {
         archiveFiles.push_back(main_path);
     } else {
         SPDLOG_ERROR("sf64.o2r file still not found after user selection");
         exit(1);
+    }
+#elif defined(__IOS__)
+    // On iOS, check for O2R files in multiple locations
+    bool foundO2R = false;
+
+    // First check app bundle (where bundled O2R files would be)
+    if (std::filesystem::exists(main_path)) {
+        SPDLOG_INFO("[iOS] Found main O2R file in bundle: {}", main_path);
+        archiveFiles.push_back(main_path);
+        foundO2R = true;
+    } else {
+        // Not in bundle, check Documents directory
+        const std::string docs_main_path = Ship::Context::GetPathRelativeToAppDirectory("sf64.o2r");
+        if (std::filesystem::exists(docs_main_path)) {
+            SPDLOG_INFO("[iOS] Found main O2R file in Documents: {}", docs_main_path);
+            archiveFiles.push_back(docs_main_path);
+            foundO2R = true;
+        }
+    }
+
+    // If no O2R found, directly show file picker to generate from ROM
+    if (!foundO2R) {
+        SPDLOG_INFO("[iOS] sf64.o2r not found - will prompt for ROM file");
+
+        // Generate from ROM file - this will show the file picker
+        if (!GenAssetFile()) {
+            SPDLOG_ERROR("[iOS] Failed to generate O2R file");
+            ShowMessage("Error", "An error occurred, no O2R file was generated.\n\nExiting...");
+            exit(1);
+        } else {
+            // Generated O2R will be in Documents directory
+            const std::string docs_main_path = Ship::Context::GetPathRelativeToAppDirectory("sf64.o2r");
+            if (std::filesystem::exists(docs_main_path)) {
+                archiveFiles.push_back(docs_main_path);
+                SPDLOG_INFO("[iOS] Successfully generated and added O2R file");
+            } else {
+                SPDLOG_ERROR("[iOS] O2R generation reported success but file not found at: {}", docs_main_path);
+                exit(1);
+            }
+        }
     }
 #else
 
@@ -174,6 +226,9 @@ GameEngine::GameEngine() {
 #endif
 
     if (std::filesystem::exists(assets_path)) {
+#ifdef __IOS__
+        SPDLOG_INFO("[iOS] Found assets O2R file: {}", assets_path);
+#endif
         archiveFiles.push_back(assets_path);
     }
 
@@ -632,8 +687,10 @@ int GameEngine::ShowYesNoBox(const char* title, const char* box) {
     int ret;
 #ifdef _WIN32
     ret = MessageBoxA(nullptr, box, title, MB_YESNO | MB_ICONQUESTION);
-#elif defined(__SWITCH__)
-    SPDLOG_ERROR(box);
+#elif defined(__SWITCH__) || defined(__IOS__)
+    // On Switch and iOS, SDL message boxes don't work properly
+    // For iOS, we'll handle dialogs differently in the calling code
+    SPDLOG_INFO("[{}] {}", title, box);
     return IDYES;
 #else
     SDL_MessageBoxData boxData = { 0 };

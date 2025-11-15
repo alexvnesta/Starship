@@ -154,7 +154,7 @@ float Ship::Mobile::GetCameraPitch() {
 
 // iOS virtual controller attachment
 // Called when touch controls are enabled
-void iOS_AttachController() {
+extern "C" void iOS_AttachController() {
     // Create a virtual joystick with 6 axes and 18 buttons
     // This matches the Android implementation for consistency
     virtual_joystick_id = SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER, 6, 18, 0);
@@ -175,7 +175,7 @@ void iOS_AttachController() {
 
 // iOS virtual controller detachment
 // Called when physical controller is connected or touch controls disabled
-void iOS_DetachController() {
+extern "C" void iOS_DetachController() {
     if (virtual_joystick != nullptr) {
         SDL_JoystickClose(virtual_joystick);
         SDL_JoystickDetachVirtual(virtual_joystick_id);
@@ -189,7 +189,7 @@ void iOS_DetachController() {
 // Set button state from touch input
 // button: button index (negative values represent axes)
 // value: true for pressed, false for released
-void iOS_SetButton(int button, bool value) {
+extern "C" void iOS_SetButton(int button, bool value) {
     if (virtual_joystick == nullptr) {
         return;
     }
@@ -207,7 +207,7 @@ void iOS_SetButton(int button, bool value) {
 // Set analog stick axis value from touch input
 // axis: axis index (0-5)
 // value: axis value (-32768 to 32767)
-void iOS_SetAxis(int axis, short value) {
+extern "C" void iOS_SetAxis(int axis, short value) {
     if (virtual_joystick != nullptr) {
         SDL_JoystickSetVirtualAxis(virtual_joystick, axis, value);
     }
@@ -216,7 +216,7 @@ void iOS_SetAxis(int axis, short value) {
 // Set camera orientation from gyroscope or touch drag
 // axis: 0 for yaw (horizontal), 1 for pitch (vertical)
 // value: rotation value in radians or degrees
-void iOS_SetCameraState(int axis, float value) {
+extern "C" void iOS_SetCameraState(int axis, float value) {
     switch(axis) {
         case 0:
             cameraYaw = value;

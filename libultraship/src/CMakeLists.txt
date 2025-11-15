@@ -120,6 +120,18 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     )
 endif()
 
+if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    list(APPEND Source_Files__Port
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/StarshipViewController.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/StarshipViewController.mm
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/StarshipBridge.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/MotionController.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/MotionController.mm
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/IOSFilePicker.mm
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/ViewIntegration.mm
+    )
+endif()
+
 source_group("port" FILES ${Source_Files__Port})
 target_sources(libultraship PRIVATE ${Source_Files__Port})
 
@@ -215,6 +227,14 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     find_library(METAL Metal)
     find_library(QUARTZCORE QuartzCore)
     target_link_libraries(libultraship PRIVATE ${OSX_FOUNDATION} ${OSX_AVFOUNDATION} ${METAL} ${QUARTZCORE} ${CMAKE_DL_LIBS})
+
+    # Add UniformTypeIdentifiers framework for iOS (required by file picker)
+    if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        find_library(UNIFORM_TYPE_IDENTIFIERS UniformTypeIdentifiers)
+        if (UNIFORM_TYPE_IDENTIFIERS)
+            target_link_libraries(libultraship PRIVATE ${UNIFORM_TYPE_IDENTIFIERS})
+        endif()
+    endif()
 endif()
 
 if (USE_OPENGLES)
