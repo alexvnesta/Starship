@@ -11,6 +11,9 @@
 #import "MotionController.h"
 #import <GameController/GameController.h>
 #import "libultraship/src/Context.h"
+#include "libultraship/src/window/Window.h"
+#include "libultraship/src/window/gui/Gui.h"
+#include "libultraship/libultraship.h"
 
 // ============================================================================
 // Touch Control Configuration
