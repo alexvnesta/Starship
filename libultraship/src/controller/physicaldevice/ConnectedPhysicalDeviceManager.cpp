@@ -7,9 +7,9 @@ ConnectedPhysicalDeviceManager::ConnectedPhysicalDeviceManager() {
 ConnectedPhysicalDeviceManager::~ConnectedPhysicalDeviceManager() {
 }
 
-std::unordered_map<int32_t, SDL_GameController*>
+std::unordered_map<int32_t, SDL_Gamepad*>
 ConnectedPhysicalDeviceManager::GetConnectedSDLGamepadsForPort(uint8_t portIndex) {
-    std::unordered_map<int32_t, SDL_GameController*> result;
+    std::unordered_map<int32_t, SDL_Gamepad*> result;
 
     for (const auto& [instanceId, gamepad] : mConnectedSDLGamepads) {
         if (!PortIsIgnoringInstanceId(portIndex, instanceId)) {
@@ -52,15 +52,22 @@ void ConnectedPhysicalDeviceManager::RefreshConnectedSDLGamepads() {
     mConnectedSDLGamepads.clear();
     mConnectedSDLGamepadNames.clear();
 
-    for (int32_t i = 0; i < SDL_NumJoysticks(); i++) {
+    // SDL3: Get list of joystick IDs
+    int numJoysticks = 0;
+    SDL_JoystickID* joystickIds = SDL_GetJoysticks(&numJoysticks);
+    if (joystickIds == nullptr) {
+        return;
+    }
+
+    for (int32_t i = 0; i < numJoysticks; i++) {
         // skip if this SDL joystick isn't a Gamepad
-        if (!SDL_IsGameController(i)) {
+        if (!SDL_IsGamepad(joystickIds[i])) {
             continue;
         }
 
-        auto gamepad = SDL_GameControllerOpen(i);
-        auto instanceId = SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(gamepad));
-        auto name = SDL_GameControllerName(gamepad);
+        auto gamepad = SDL_OpenGamepad(joystickIds[i]);
+        auto instanceId = SDL_GetGamepadID(gamepad);
+        auto name = SDL_GetGamepadName(gamepad);
 
         mConnectedSDLGamepads[instanceId] = gamepad;
         mConnectedSDLGamepadNames[instanceId] = name;
@@ -69,5 +76,7 @@ void ConnectedPhysicalDeviceManager::RefreshConnectedSDLGamepads() {
             mIgnoredInstanceIds[port].insert(instanceId);
         }
     }
+
+    SDL_free(joystickIds);
 }
 } // namespace Ship

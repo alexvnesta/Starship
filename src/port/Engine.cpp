@@ -6,7 +6,7 @@
 #include <thread>
 #include <chrono>
 #include <jni.h>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #endif
 
 #include "extractor/GameExtractor.h"
@@ -121,10 +121,10 @@ GameEngine::GameEngine() {
     const std::string assets_path = appDir + "/starship.o2r";
 #elif defined(__IOS__)
     // On iOS, O2R files are bundled in the app bundle
-    char* basePath = SDL_GetBasePath();
+    const char* basePath = SDL_GetBasePath();
     const std::string appDir = basePath ? std::string(basePath) : std::string(".");
     if (basePath) {
-        SDL_free(basePath);
+        SDL_free((void*)basePath);
     }
     const std::string main_path = appDir + "sf64.o2r";
     const std::string assets_path = appDir + "starship.o2r";
@@ -254,30 +254,30 @@ GameEngine::GameEngine() {
         // KeyboardKeyToAxisDirectionMappings - use built-in LUS defaults
         std::unordered_map<Ship::StickIndex, std::vector<std::pair<Ship::Direction, Ship::KbScancode>>>(),
         // SDLButtonToButtonMappings
-        std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GameControllerButton>>{
-            { BTN_A, { SDL_CONTROLLER_BUTTON_A } },
-            { BTN_B, { SDL_CONTROLLER_BUTTON_X } },
-            { BTN_START, { SDL_CONTROLLER_BUTTON_START } },
-            { BTN_CLEFT, { SDL_CONTROLLER_BUTTON_Y } },
-            { BTN_CDOWN, { SDL_CONTROLLER_BUTTON_B } },
-            { BTN_DUP, { SDL_CONTROLLER_BUTTON_DPAD_UP } },
-            { BTN_DDOWN, { SDL_CONTROLLER_BUTTON_DPAD_DOWN } },
-            { BTN_DLEFT, { SDL_CONTROLLER_BUTTON_DPAD_LEFT } },
-            { BTN_DRIGHT, { SDL_CONTROLLER_BUTTON_DPAD_RIGHT } },
-            { BTN_R, { SDL_CONTROLLER_BUTTON_RIGHTSHOULDER } },
-            { BTN_Z, { SDL_CONTROLLER_BUTTON_LEFTSHOULDER } }
+        std::unordered_map<CONTROLLERBUTTONS_T, std::unordered_set<SDL_GamepadButton>>{
+            { BTN_A, { SDL_GAMEPAD_BUTTON_SOUTH } },
+            { BTN_B, { SDL_GAMEPAD_BUTTON_WEST } },
+            { BTN_START, { SDL_GAMEPAD_BUTTON_START } },
+            { BTN_CLEFT, { SDL_GAMEPAD_BUTTON_NORTH } },
+            { BTN_CDOWN, { SDL_GAMEPAD_BUTTON_EAST } },
+            { BTN_DUP, { SDL_GAMEPAD_BUTTON_DPAD_UP } },
+            { BTN_DDOWN, { SDL_GAMEPAD_BUTTON_DPAD_DOWN } },
+            { BTN_DLEFT, { SDL_GAMEPAD_BUTTON_DPAD_LEFT } },
+            { BTN_DRIGHT, { SDL_GAMEPAD_BUTTON_DPAD_RIGHT } },
+            { BTN_R, { SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER } },
+            { BTN_Z, { SDL_GAMEPAD_BUTTON_LEFT_SHOULDER } }
         },
         // SDLButtonToAxisDirectionMappings - use built-in LUS defaults
-        std::unordered_map<Ship::StickIndex, std::vector<std::pair<Ship::Direction, SDL_GameControllerButton>>>(),
+        std::unordered_map<Ship::StickIndex, std::vector<std::pair<Ship::Direction, SDL_GamepadButton>>>(),
         // SDLAxisDirectionToButtonMappings
-        std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GameControllerAxis, int32_t>>>{
-            { BTN_CLEFT, { { SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 1 } } },
-            { BTN_CDOWN, { { SDL_CONTROLLER_AXIS_TRIGGERLEFT, 1 } } },
-            { BTN_CUP, { { SDL_CONTROLLER_AXIS_RIGHTY, -1 } } },
-            { BTN_CRIGHT, { { SDL_CONTROLLER_AXIS_RIGHTX, 1 } } }
+        std::unordered_map<CONTROLLERBUTTONS_T, std::vector<std::pair<SDL_GamepadAxis, int32_t>>>{
+            { BTN_CLEFT, { { SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, 1 } } },
+            { BTN_CDOWN, { { SDL_GAMEPAD_AXIS_LEFT_TRIGGER, 1 } } },
+            { BTN_CUP, { { SDL_GAMEPAD_AXIS_RIGHTY, -1 } } },
+            { BTN_CRIGHT, { { SDL_GAMEPAD_AXIS_RIGHTX, 1 } } }
         },
         // SDLAxisDirectionToAxisDirectionMappings - use built-in LUS defaults
-        std::unordered_map<Ship::StickIndex, std::vector<std::pair<Ship::Direction, std::pair<SDL_GameControllerAxis, int32_t>>>>()
+        std::unordered_map<Ship::StickIndex, std::vector<std::pair<Ship::Direction, std::pair<SDL_GamepadAxis, int32_t>>>>()
     );
     auto controlDeck = std::make_shared<LUS::ControlDeck>(std::vector<CONTROLLERBUTTONS_T>(), defaultMappings);
 

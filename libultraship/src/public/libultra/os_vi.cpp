@@ -2,7 +2,7 @@
 
 extern "C" {
 
-Uint32 __lusViCallback(Uint32 interval, void* param) {
+Uint32 SDLCALL __lusViCallback(void* param, SDL_TimerID timerID, Uint32 interval) {
     __OSEventState* es = &__osEventStateTab[OS_EVENT_VI];
 
     if (es && es->queue) {
@@ -13,7 +13,8 @@ Uint32 __lusViCallback(Uint32 interval, void* param) {
 }
 
 void osCreateViManager(OSPri pri) {
-    SDL_AddTimer(16, &__lusViCallback, NULL);
+    static int dummy = 0;
+    SDL_AddTimer(16, __lusViCallback, &dummy);
 }
 
 void osViSetEvent(OSMesgQueue* queue, OSMesg mesg, uint32_t c) {

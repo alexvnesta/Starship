@@ -218,12 +218,12 @@ bool Context::InitResourceManager(const std::vector<std::string>& archivePaths,
 
 #ifdef __IOS__
         // On iOS, also search in the app bundle for pre-bundled O2R files
-        char* basePath = SDL_GetBasePath();
+        const char* basePath = SDL_GetBasePath();
         if (basePath) {
             std::string bundlePath = std::string(basePath);
             SPDLOG_INFO("[iOS] Adding bundle path to archive search: {}", bundlePath);
             paths.push_back(bundlePath);
-            SDL_free(basePath);
+            SDL_free((void*)basePath);
         } else {
             SPDLOG_WARN("[iOS] SDL_GetBasePath() returned NULL");
         }

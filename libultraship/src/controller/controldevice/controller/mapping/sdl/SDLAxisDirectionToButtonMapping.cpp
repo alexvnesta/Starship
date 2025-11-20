@@ -6,6 +6,11 @@
 #include "Context.h"
 #include "controller/controldeck/ControlDeck.h"
 
+// iOS axis state cache for bypassing SDL3's broken virtual joystick queries
+#ifdef __IOS__
+extern "C" int16_t iOS_GetAxisState(int axis);
+#endif
+
 namespace Ship {
 SDLAxisDirectionToButtonMapping::SDLAxisDirectionToButtonMapping(uint8_t portIndex, CONTROLLERBUTTONS_T bitmask,
                                                                  int32_t sdlControllerAxis, int32_t axisDirection)
@@ -35,7 +40,12 @@ void SDLAxisDirectionToButtonMapping::UpdatePad(CONTROLLERBUTTONS_T& padButtons)
     for (const auto& [instanceId, gamepad] :
          Context::GetInstance()->GetControlDeck()->GetConnectedPhysicalDeviceManager()->GetConnectedSDLGamepadsForPort(
              mPortIndex)) {
-        const auto axisValue = SDL_GameControllerGetAxis(gamepad, mControllerAxis);
+#ifdef __IOS__
+        // CRITICAL FIX: On iOS, bypass SDL3's broken virtual joystick axis queries entirely
+        const auto axisValue = iOS_GetAxisState(mControllerAxis);
+#else
+        const auto axisValue = SDL_GetGamepadAxis(gamepad, mControllerAxis);
+#endif
 
         auto axisMinValue = SDL_JOYSTICK_AXIS_MAX * (axisThresholdPercentage / 100.0f);
         if ((mAxisDirection == POSITIVE && axisValue > axisMinValue) ||

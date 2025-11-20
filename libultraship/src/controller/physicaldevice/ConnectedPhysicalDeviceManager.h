@@ -4,7 +4,7 @@
 #include <unordered_set>
 #include <vector>
 #include <string>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 namespace Ship {
 
@@ -13,7 +13,7 @@ class ConnectedPhysicalDeviceManager {
     ConnectedPhysicalDeviceManager();
     ~ConnectedPhysicalDeviceManager();
 
-    std::unordered_map<int32_t, SDL_GameController*> GetConnectedSDLGamepadsForPort(uint8_t portIndex);
+    std::unordered_map<int32_t, SDL_Gamepad*> GetConnectedSDLGamepadsForPort(uint8_t portIndex);
     std::unordered_map<int32_t, std::string> GetConnectedSDLGamepadNames();
     std::unordered_set<int32_t> GetIgnoredInstanceIdsForPort(uint8_t portIndex);
     bool PortIsIgnoringInstanceId(uint8_t portIndex, int32_t instanceId);
@@ -25,7 +25,7 @@ class ConnectedPhysicalDeviceManager {
     void RefreshConnectedSDLGamepads();
 
   private:
-    std::unordered_map<int32_t, SDL_GameController*> mConnectedSDLGamepads;
+    std::unordered_map<int32_t, SDL_Gamepad*> mConnectedSDLGamepads;
     std::unordered_map<int32_t, std::string> mConnectedSDLGamepadNames;
     std::unordered_map<uint8_t, std::unordered_set<int32_t>> mIgnoredInstanceIds;
 };

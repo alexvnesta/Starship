@@ -48,12 +48,9 @@ std::shared_ptr<ControllerRumbleMapping> RumbleMappingFactory::CreateRumbleMappi
     for (auto [instanceId, gamepad] :
          Context::GetInstance()->GetControlDeck()->GetConnectedPhysicalDeviceManager()->GetConnectedSDLGamepadsForPort(
              portIndex)) {
-        if (!SDL_GameControllerHasRumble(gamepad)) {
-            continue;
-        }
-
-        for (int32_t button = SDL_CONTROLLER_BUTTON_A; button < SDL_CONTROLLER_BUTTON_MAX; button++) {
-            if (SDL_GameControllerGetButton(gamepad, static_cast<SDL_GameControllerButton>(button))) {
+        // In SDL3, we just try to create the mapping and rumble will work if supported
+        for (int32_t button = SDL_GAMEPAD_BUTTON_SOUTH; button < SDL_GAMEPAD_BUTTON_COUNT; button++) {
+            if (SDL_GetGamepadButton(gamepad, static_cast<SDL_GamepadButton>(button))) {
                 mapping = std::make_shared<SDLRumbleMapping>(portIndex, DEFAULT_LOW_FREQUENCY_RUMBLE_PERCENTAGE,
                                                              DEFAULT_HIGH_FREQUENCY_RUMBLE_PERCENTAGE);
                 break;
@@ -64,9 +61,9 @@ std::shared_ptr<ControllerRumbleMapping> RumbleMappingFactory::CreateRumbleMappi
             break;
         }
 
-        for (int32_t i = SDL_CONTROLLER_AXIS_LEFTX; i < SDL_CONTROLLER_AXIS_MAX; i++) {
-            const auto axis = static_cast<SDL_GameControllerAxis>(i);
-            const auto axisValue = SDL_GameControllerGetAxis(gamepad, axis) / 32767.0f;
+        for (int32_t i = SDL_GAMEPAD_AXIS_LEFTX; i < SDL_GAMEPAD_AXIS_COUNT; i++) {
+            const auto axis = static_cast<SDL_GamepadAxis>(i);
+            const auto axisValue = SDL_GetGamepadAxis(gamepad, axis) / 32767.0f;
             int32_t axisDirection = 0;
             if (axisValue < -0.7f) {
                 axisDirection = NEGATIVE;

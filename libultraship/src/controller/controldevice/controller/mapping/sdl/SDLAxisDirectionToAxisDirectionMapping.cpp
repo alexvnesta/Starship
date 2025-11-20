@@ -6,6 +6,11 @@
 #include "Context.h"
 #include "controller/controldeck/ControlDeck.h"
 
+// iOS axis state cache for bypassing SDL3's broken virtual joystick queries
+#ifdef __IOS__
+extern "C" int16_t iOS_GetAxisState(int axis);
+#endif
+
 #define MAX_SDL_RANGE (float)INT16_MAX
 
 namespace Ship {
@@ -28,7 +33,13 @@ float SDLAxisDirectionToAxisDirectionMapping::GetNormalizedAxisDirectionValue() 
     for (const auto& [instanceId, gamepad] :
          Context::GetInstance()->GetControlDeck()->GetConnectedPhysicalDeviceManager()->GetConnectedSDLGamepadsForPort(
              mPortIndex)) {
-        const auto axisValue = SDL_GameControllerGetAxis(gamepad, mControllerAxis);
+#ifdef __IOS__
+        // CRITICAL FIX: On iOS, bypass SDL3's broken virtual joystick axis queries entirely
+        // SDL3's virtual joystick axis state queries don't work - use direct axis state cache instead
+        const auto axisValue = iOS_GetAxisState(mControllerAxis);
+#else
+        const auto axisValue = SDL_GetGamepadAxis(gamepad, mControllerAxis);
+#endif
 
         if ((mAxisDirection == POSITIVE && axisValue < 0) || (mAxisDirection == NEGATIVE && axisValue > 0)) {
             normalizedValues.push_back(0.0f);

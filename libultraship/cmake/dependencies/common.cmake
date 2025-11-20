@@ -2,6 +2,25 @@ include(FetchContent)
 
 find_package(OpenGL QUIET)
 
+# =================== SDL3 for iOS ===================
+# Fetch SDL3 early for iOS so it's available when ImGui backend is configured
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    find_package(SDL3 QUIET)
+    if (NOT ${SDL3_FOUND})
+        # Force SDL3 to build as static library for iOS (dynamic libraries not supported on iOS)
+        set(SDL_SHARED OFF CACHE BOOL "Build SDL3 as shared library" FORCE)
+        set(SDL_STATIC ON CACHE BOOL "Build SDL3 as static library" FORCE)
+
+        FetchContent_Declare(
+            SDL3
+            GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+            GIT_TAG release-3.2.0
+            OVERRIDE_FIND_PACKAGE
+        )
+        FetchContent_MakeAvailable(SDL3)
+    endif()
+endif()
+
 #=================== ImGui ===================
 set(imgui_fixes_and_config_patch_file ${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies/patches/imgui-fixes-and-config.patch)
 set(imgui_apply_patch_command ${CMAKE_COMMAND} -Dpatch_file=${imgui_fixes_and_config_patch_file} -Dwith_reset=TRUE -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies/git-patch.cmake)
@@ -30,10 +49,16 @@ target_sources(ImGui
 target_sources(ImGui
     PRIVATE
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
 )
 
-target_include_directories(ImGui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends PRIVATE ${SDL2_INCLUDE_DIRS})
+# Platform-specific SDL backend
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_sources(ImGui PRIVATE ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp)
+    target_include_directories(ImGui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends PRIVATE ${SDL3_INCLUDE_DIRS})
+else()
+    target_sources(ImGui PRIVATE ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp)
+    target_include_directories(ImGui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends PRIVATE ${SDL2_INCLUDE_DIRS})
+endif()
 
 # ========= StormLib =============
 if(NOT EXCLUDE_MPQ_SUPPORT)

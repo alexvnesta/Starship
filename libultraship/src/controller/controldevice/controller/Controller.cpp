@@ -3,9 +3,9 @@
 #include <algorithm>
 #include "public/bridge/consolevariablebridge.h"
 #if __APPLE__
-#include <SDL_events.h>
+#include <SDL3/SDL_events.h>
 #else
-#include <SDL2/SDL_events.h>
+#include <SDL3/SDL_events.h>
 #endif
 #include <spdlog/spdlog.h>
 #include "utils/StringHelper.h"

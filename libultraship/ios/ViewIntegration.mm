@@ -7,10 +7,10 @@
 //
 
 #import <UIKit/UIKit.h>
-#import <SDL.h>
-#import <SDL_syswm.h>
+#import <SDL3/SDL.h>
 #import "StarshipViewController.h"
 #import "StarshipBridge.h"
+#import "StarshipSceneDelegate.h"
 
 // Global reference to the view controller
 static StarshipViewController* g_viewController = nil;
@@ -25,15 +25,8 @@ void iOS_IntegrateSDLView(void* sdlWindow) {
 
     SDL_Window* window = (SDL_Window*)sdlWindow;
 
-    // Get the SDL window's UIWindow
-    SDL_SysWMinfo wmInfo;
-    SDL_VERSION(&wmInfo.version);
-    if (!SDL_GetWindowWMInfo(window, &wmInfo)) {
-        NSLog(@"[iOS View Integration] Error: Failed to get window info: %s", SDL_GetError());
-        return;
-    }
-
-    UIWindow* uiWindow = wmInfo.info.uikit.window;
+    // Get the SDL window's UIWindow using SDL3 properties API
+    UIWindow* uiWindow = (__bridge UIWindow*)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_UIKIT_WINDOW_POINTER, NULL);
     if (!uiWindow) {
         NSLog(@"[iOS View Integration] Error: UIWindow is null");
         return;
@@ -61,46 +54,118 @@ void iOS_IntegrateSDLView(void* sdlWindow) {
     }
 
     NSLog(@"[iOS View Integration] Got SDL view: %@", sdlView);
+    NSLog(@"[iOS View Integration] SDL view frame: %@", NSStringFromCGRect(sdlView.frame));
+    NSLog(@"[iOS View Integration] SDL view bounds: %@", NSStringFromCGRect(sdlView.bounds));
+    NSLog(@"[iOS View Integration] SDL view controller: %@", sdlViewController);
+    NSLog(@"[iOS View Integration] SDL view layer: %@", sdlView.layer);
+    NSLog(@"[iOS View Integration] SDL view layer class: %@", NSStringFromClass([sdlView.layer class]));
+    NSLog(@"[iOS View Integration] SDL view backgroundColor: %@", sdlView.backgroundColor);
+    NSLog(@"[iOS View Integration] SDL view opaque: %d", sdlView.opaque);
+    NSLog(@"[iOS View Integration] SDL view hidden: %d", sdlView.hidden);
+    NSLog(@"[iOS View Integration] SDL view alpha: %.2f", sdlView.alpha);
+    NSLog(@"[iOS View Integration] SDL view superview: %@", sdlView.superview);
+    NSLog(@"[iOS View Integration] SDL window: %@", uiWindow);
+    NSLog(@"[iOS View Integration] SDL window hidden: %d", uiWindow.hidden);
+    NSLog(@"[iOS View Integration] SDL window alpha: %.2f", uiWindow.alpha);
+    NSLog(@"[iOS View Integration] SDL window isKeyWindow: %d", uiWindow.isKeyWindow);
 
-    // Ensure our view controller's view is loaded
-    [g_viewController loadViewIfNeeded];
+    // CRITICAL: Set the SceneDelegate's window property for iOS 13+ scene-based lifecycle
+    // The SceneDelegate MUST own the window for it to become key and visible
+    NSLog(@"[iOS View Integration] Checking window scene...");
+    NSLog(@"[iOS View Integration] uiWindow.windowScene: %@", uiWindow.windowScene);
 
-    // Set the root view controller for SDL's window
-    uiWindow.rootViewController = g_viewController;
+    if (uiWindow.windowScene) {
+        UIWindowScene *windowScene = uiWindow.windowScene;
+        NSLog(@"[iOS View Integration] windowScene.delegate: %@", windowScene.delegate);
+        NSLog(@"[iOS View Integration] windowScene.delegate class: %@", NSStringFromClass([windowScene.delegate class]));
+
+        if (windowScene.delegate && [windowScene.delegate isKindOfClass:[StarshipSceneDelegate class]]) {
+            StarshipSceneDelegate *sceneDelegate = (StarshipSceneDelegate *)windowScene.delegate;
+            sceneDelegate.window = uiWindow;
+            NSLog(@"[iOS View Integration] ✅ Set SceneDelegate.window property - window will now become key");
+        } else {
+            NSLog(@"[iOS View Integration] ❌ Warning: SceneDelegate is not StarshipSceneDelegate class");
+        }
+    } else {
+        NSLog(@"[iOS View Integration] ❌ ERROR: uiWindow.windowScene is NIL - SDL window not associated with scene!");
+        NSLog(@"[iOS View Integration] This is the root cause - need to associate window with scene manually");
+
+        // Try to find the active window scene and associate the window with it
+        NSSet<UIScene *> *connectedScenes = [UIApplication sharedApplication].connectedScenes;
+        NSLog(@"[iOS View Integration] Connected scenes: %@", connectedScenes);
+
+        for (UIScene *scene in connectedScenes) {
+            if ([scene isKindOfClass:[UIWindowScene class]]) {
+                UIWindowScene *windowScene = (UIWindowScene *)scene;
+                NSLog(@"[iOS View Integration] Found UIWindowScene: %@", windowScene);
+
+                // Associate the window with this scene
+                uiWindow.windowScene = windowScene;
+                NSLog(@"[iOS View Integration] Associated SDL window with scene");
+
+                // Now try to set the delegate's window property
+                if (windowScene.delegate && [windowScene.delegate isKindOfClass:[StarshipSceneDelegate class]]) {
+                    StarshipSceneDelegate *sceneDelegate = (StarshipSceneDelegate *)windowScene.delegate;
+                    sceneDelegate.window = uiWindow;
+                    NSLog(@"[iOS View Integration] ✅ Set SceneDelegate.window property after manual scene association");
+                }
+                break;
+            }
+        }
+    }
+
+    // Make sure the window is visible and key
+    uiWindow.hidden = NO;
+    uiWindow.alpha = 1.0;
     [uiWindow makeKeyAndVisible];
 
-    NSLog(@"[iOS View Integration] SDL window root view controller set");
+    // Force the Metal layer to display
+    CAMetalLayer* metalLayer = (CAMetalLayer*)sdlView.layer;
+    [metalLayer setNeedsDisplay];
+    [metalLayer displayIfNeeded];
 
-    // Create a SEPARATE overlay window for touch controls that sits on top of SDL
-    // This ensures SDL's rendering cannot block the touch controls
-    g_viewController.overlayWindow = [[UIWindow alloc] initWithFrame:uiWindow.bounds];
-    g_viewController.overlayWindow.windowLevel = UIWindowLevelNormal + 1;  // Above normal windows
-    g_viewController.overlayWindow.backgroundColor = [UIColor clearColor];
-    g_viewController.overlayWindow.userInteractionEnabled = YES;
-    g_viewController.overlayWindow.opaque = NO;
+    // Force the view and window to update
+    [sdlView setNeedsDisplay];
+    [sdlView setNeedsLayout];
+    [sdlView layoutIfNeeded];
+    [uiWindow setNeedsDisplay];
+    [uiWindow setNeedsLayout];
+    [uiWindow layoutIfNeeded];
 
-    // Create a transparent view controller for the overlay window
-    UIViewController *overlayVC = [[UIViewController alloc] init];
-    overlayVC.view.backgroundColor = [UIColor clearColor];
-    overlayVC.view.frame = g_viewController.overlayWindow.bounds;
-    g_viewController.overlayWindow.rootViewController = overlayVC;
+    NSLog(@"[iOS View Integration] Made window key and visible");
+    NSLog(@"[iOS View Integration] Forced display updates on view and layer");
 
-    // Add touch controls to the overlay window
-    g_viewController.touchControlsContainer.frame = overlayVC.view.bounds;
-    g_viewController.touchControlsContainer.hidden = NO;
-    g_viewController.touchControlsContainer.alpha = 1.0;
-    g_viewController.touchControlsContainer.userInteractionEnabled = YES;
-    [overlayVC.view addSubview:g_viewController.touchControlsContainer];
+    // Create overlay window for touch controls
+    // This window sits on top of the SDL window to display touch controls
+    UIWindowScene *windowScene = uiWindow.windowScene;
+    if (windowScene) {
+        // Load the view controller's view to trigger viewDidLoad and setupTouchControls
+        [g_viewController loadViewIfNeeded];
 
-    // Make the overlay window visible
-    [g_viewController.overlayWindow makeKeyAndVisible];
+        // Create a new UIWindow for the touch controls overlay
+        UIWindow *overlayWindow = [[UIWindow alloc] initWithWindowScene:windowScene];
+        overlayWindow.rootViewController = g_viewController;
+        overlayWindow.windowLevel = UIWindowLevelNormal + 1;  // Above SDL window
+        overlayWindow.backgroundColor = [UIColor clearColor];  // Transparent background
+        overlayWindow.opaque = NO;
+        overlayWindow.userInteractionEnabled = YES;
 
-    NSLog(@"[iOS View Integration] Created separate overlay window for touch controls");
-    NSLog(@"[iOS View Integration] Overlay window level: %f", g_viewController.overlayWindow.windowLevel);
-    NSLog(@"[iOS View Integration] Touch controls container frame: %@, hidden: %d, alpha: %.2f",
-          NSStringFromCGRect(g_viewController.touchControlsContainer.frame),
-          g_viewController.touchControlsContainer.hidden,
-          g_viewController.touchControlsContainer.alpha);
+        // Make overlay window visible AND key so it can receive touch events
+        // Metal rendering works fine even if SDL window is not key
+        [overlayWindow makeKeyAndVisible];
 
-    NSLog(@"[iOS View Integration] Integration complete! Touch controls should now be visible.");
+        // Store reference in view controller
+        g_viewController.overlayWindow = overlayWindow;
+
+        NSLog(@"[iOS View Integration] Created touch controls overlay window");
+        NSLog(@"[iOS View Integration] Overlay window: %@", overlayWindow);
+        NSLog(@"[iOS View Integration] Touch controls container: %@", g_viewController.touchControlsContainer);
+        NSLog(@"[iOS View Integration] Touch controls hidden: %d", g_viewController.touchControlsContainer.hidden);
+        NSLog(@"[iOS View Integration] Overlay window isKeyWindow: %d", overlayWindow.isKeyWindow);
+        NSLog(@"[iOS View Integration] SDL window isKeyWindow: %d", uiWindow.isKeyWindow);
+    } else {
+        NSLog(@"[iOS View Integration] ❌ ERROR: Cannot create overlay window - no window scene available");
+    }
+
+    NSLog(@"[iOS View Integration] Integration complete");
 }

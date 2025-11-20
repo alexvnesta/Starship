@@ -1,6 +1,14 @@
 #include "libultraship/libultraship.h"
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <ratio>
+
+#ifdef __APPLE__
+    #include "TargetConditionals.h"
+    #if TARGET_OS_IPHONE
+        // Declare iOS audio session configuration function
+        extern "C" bool ConfigureIOSAudioSession();
+    #endif
+#endif
 
 // Establish a chrono duration for the N64 46.875MHz clock rate
 typedef std::ratio<3000, 64> n64ClockRatio;
@@ -16,7 +24,7 @@ int32_t osContInit(OSMesgQueue* mq, uint8_t* controllerBits, OSContStatus* statu
     status->status |= 1;
 
     std::string controllerDb = Ship::Context::LocateFileAcrossAppDirs("gamecontrollerdb.txt");
-    int mappingsAdded = SDL_GameControllerAddMappingsFromFile(controllerDb.c_str());
+    int mappingsAdded = SDL_AddGamepadMappingsFromFile(controllerDb.c_str());
     if (mappingsAdded >= 0) {
         SPDLOG_INFO("Added SDL game controllers from \"{}\" ({})", controllerDb, mappingsAdded);
     } else {
@@ -24,9 +32,29 @@ int32_t osContInit(OSMesgQueue* mq, uint8_t* controllerBits, OSContStatus* statu
     }
 
     SDL_SetHint(SDL_HINT_JOYSTICK_THREAD, "1");
-    if (SDL_Init(SDL_INIT_GAMECONTROLLER) != 0) {
-        SPDLOG_ERROR("Failed to initialize SDL game controllers ({})", SDL_GetError());
-        exit(EXIT_FAILURE);
+
+    // SDL3 iOS audio configuration
+    // CRITICAL: SDL_HINT_AUDIO_CATEGORY must be set BEFORE opening any audio devices
+    // "playback" = AVAudioSessionCategoryPlayback (plays even when silent switch is on)
+    // "ambient" = AVAudioSessionCategoryAmbient (default, muted by silent switch)
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+    SDL_SetHint(SDL_HINT_AUDIO_CATEGORY, "playback");
+    SPDLOG_INFO("iOS: Set SDL_HINT_AUDIO_CATEGORY to 'playback'");
+#endif
+
+    // Initialize SDL with audio support
+    // SDL3 requires SDL_Init() to be called before subsystems can be initialized
+    if (!SDL_Init(SDL_INIT_AUDIO)) {
+        SPDLOG_ERROR("Failed to initialize SDL with audio: {}", SDL_GetError());
+    } else {
+        SPDLOG_INFO("SDL initialized with audio support");
+
+        // Now initialize the audio player
+        auto audio = Ship::Context::GetInstance()->GetAudio();
+        if (audio) {
+            audio->InitAudioPlayer();
+            SPDLOG_INFO("Audio player initialized");
+        }
     }
 
     Ship::Context::GetInstance()->GetControlDeck()->Init(controllerBits);

@@ -14,7 +14,7 @@ class SDLAxisDirectionToAnyMapping : virtual public ControllerInputMapping {
     bool AxisIsStick();
 
   protected:
-    SDL_GameControllerAxis mControllerAxis;
+    SDL_GamepadAxis mControllerAxis;
     AxisDirection mAxisDirection;
 };
 } // namespace Ship

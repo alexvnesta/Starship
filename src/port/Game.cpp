@@ -1,3 +1,4 @@
+#include <SDL3/SDL_main.h>
 #include <libultraship.h>
 
 #include <Fast3D/interpreter.h>

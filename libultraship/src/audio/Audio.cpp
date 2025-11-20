@@ -22,11 +22,10 @@ void Audio::InitAudioPlayer() {
 
     if (mAudioPlayer) {
         if (!mAudioPlayer->Init()) {
-            // Failed to initialize system audio player.
-            // Fallback to SDL if the native system player does not work.
-            SetCurrentAudioBackend(AudioBackend::SDL);
-            mAudioPlayer = std::make_shared<SDLAudioPlayer>(this->mAudioSettings);
-            mAudioPlayer->Init();
+            // Failed to initialize audio player
+            SPDLOG_ERROR("Failed to initialize audio player");
+            // On iOS, audio may not be available - continue without audio
+            mAudioPlayer = nullptr;
         }
     }
 }
@@ -38,7 +37,10 @@ void Audio::Init() {
 #endif
     mAvailableAudioBackends->push_back(AudioBackend::SDL);
 
-    SetCurrentAudioBackend(Context::GetInstance()->GetConfig()->GetCurrentAudioBackend());
+    // Store the audio backend but don't initialize the audio player yet
+    // On iOS, SDL audio subsystem needs to be initialized first
+    // InitAudioPlayer() will be called later from osContInit() after SDL audio is ready
+    mAudioBackend = Context::GetInstance()->GetConfig()->GetCurrentAudioBackend();
 }
 
 std::shared_ptr<AudioPlayer> Audio::GetAudioPlayer() {

@@ -12,7 +12,7 @@ class SDLButtonToAnyMapping : virtual public ControllerInputMapping {
     std::string GetPhysicalDeviceName() override;
 
   protected:
-    SDL_GameControllerButton mControllerButton;
+    SDL_GamepadButton mControllerButton;
 
   private:
     std::string GetGenericButtonName();

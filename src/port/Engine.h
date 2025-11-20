@@ -11,7 +11,7 @@ typedef enum {
 
 #ifdef __cplusplus
 #include <vector>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <Fast3D/interpreter.h>
 #include "libultraship/src/Context.h"
 

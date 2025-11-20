@@ -7,7 +7,7 @@ class FileDropMgr {
   public:
     FileDropMgr() = default;
     ~FileDropMgr();
-    void SetDroppedFile(char* path);
+    void SetDroppedFile(const char* path);
     void ClearDroppedFile();
     bool FileDropped() const;
     char* GetDroppedFile() const;

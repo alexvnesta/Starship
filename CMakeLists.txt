@@ -180,6 +180,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(IMAGE_FILES ${IOS_DIR}/PoweredBy.png)
     set(ICON_FILES ${IOS_DIR}/Icon.png)
     set(O2R_FILES ${CMAKE_CURRENT_SOURCE_DIR}/sf64.o2r ${CMAKE_CURRENT_SOURCE_DIR}/starship.o2r)
+    # Delegate files are compiled into libultraship, don't add them to main app to avoid duplicate symbols
 
     list(APPEND ALL_FILES ${STORYBOARD_FILE} ${IMAGE_FILES} ${ICON_FILES} ${O2R_FILES})
 
@@ -294,7 +295,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/libultraship/libultraship/Lib/spdlog/include/
   ${CMAKE_CURRENT_SOURCE_DIR}/libultraship/src/graphic/Fast3D/U64/PR
   ${CMAKE_CURRENT_SOURCE_DIR}/libultraship/src/graphic
-  ${SDL2_INCLUDE_DIRS}
+  ${SDL3_INCLUDE_DIRS}
   ${GLEW_INCLUDE_DIRS}
   ${dr_libs_SOURCE_DIR}
 )
@@ -302,6 +303,11 @@ include_directories(
 add_subdirectory(libultraship ${CMAKE_CURRENT_SOURCE_DIR}/libultraship)
 add_dependencies(${PROJECT_NAME} libultraship)
 target_link_libraries(${PROJECT_NAME} PRIVATE libultraship)
+
+# iOS: Add -ObjC linker flag to ensure +load methods in static libraries are linked
+if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_link_options(${PROJECT_NAME} PRIVATE "-ObjC")
+endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_compile_definitions(${PROJECT_NAME} PRIVATE
@@ -426,12 +432,20 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     )
     FetchContent_MakeAvailable(libvorbis)
 
+    # Link iOS-specific frameworks
+    find_library(COREGRAPHICS_FRAMEWORK CoreGraphics REQUIRED)
+    find_library(GAMECONTROLLER_FRAMEWORK GameController REQUIRED)
+    find_library(COREMOTION_FRAMEWORK CoreMotion REQUIRED)
+
     set(ADDITIONAL_LIBRARY_DEPENDENCIES
         "libultraship;"
-        SDL2::SDL2-static
+        SDL3::SDL3
         ogg
         vorbis
         vorbisfile
+        ${COREGRAPHICS_FRAMEWORK}
+        ${GAMECONTROLLER_FRAMEWORK}
+        ${COREMOTION_FRAMEWORK}
     )
 
 else() # Linux and others

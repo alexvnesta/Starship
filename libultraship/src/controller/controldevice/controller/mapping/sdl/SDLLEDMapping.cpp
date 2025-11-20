@@ -22,11 +22,10 @@ void SDLLEDMapping::SetLEDColor(Color_RGB8 color) {
     for (const auto& [instanceId, gamepad] :
          Context::GetInstance()->GetControlDeck()->GetConnectedPhysicalDeviceManager()->GetConnectedSDLGamepadsForPort(
              mPortIndex)) {
-        if (!SDL_GameControllerHasLED(gamepad)) {
-            continue;
+        SDL_Joystick* joystick = SDL_GetGamepadJoystick(gamepad);
+        if (joystick) {
+            SDL_SetJoystickLED(joystick, color.r, color.g, color.b);
         }
-
-        SDL_JoystickSetLED(SDL_GameControllerGetJoystick(gamepad), color.r, color.g, color.b);
     }
 }
 

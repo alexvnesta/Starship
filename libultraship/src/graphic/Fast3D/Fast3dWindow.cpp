@@ -128,13 +128,13 @@ void Fast3dWindow::InitWindowManager() {
 #ifdef ENABLE_OPENGL
         case Ship::WindowBackend::FAST3D_SDL_OPENGL:
             mRenderingApi = new GfxRenderingAPIOGL();
-            mWindowManagerApi = new GfxWindowBackendSDL2();
+            mWindowManagerApi = new GfxWindowBackendSDL3();
             break;
 #endif
 #ifdef __APPLE__
         case Ship::WindowBackend::FAST3D_SDL_METAL:
             mRenderingApi = new GfxRenderingAPIMetal();
-            mWindowManagerApi = new GfxWindowBackendSDL2();
+            mWindowManagerApi = new GfxWindowBackendSDL3();
             break;
 #endif
         default:

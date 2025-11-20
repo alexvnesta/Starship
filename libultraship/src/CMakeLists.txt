@@ -122,6 +122,10 @@ endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
     list(APPEND Source_Files__Port
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/StarshipAppDelegate.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/StarshipAppDelegate.mm
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/StarshipSceneDelegate.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/StarshipSceneDelegate.mm
         ${CMAKE_CURRENT_SOURCE_DIR}/../ios/StarshipViewController.h
         ${CMAKE_CURRENT_SOURCE_DIR}/../ios/StarshipViewController.mm
         ${CMAKE_CURRENT_SOURCE_DIR}/../ios/StarshipBridge.h
@@ -129,6 +133,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
         ${CMAKE_CURRENT_SOURCE_DIR}/../ios/MotionController.mm
         ${CMAKE_CURRENT_SOURCE_DIR}/../ios/IOSFilePicker.mm
         ${CMAKE_CURRENT_SOURCE_DIR}/../ios/ViewIntegration.mm
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/AudioSessionHelper.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/AudioSessionHelper.mm
     )
 endif()
 
@@ -167,6 +173,8 @@ endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
     list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/gfx_opengl*")
+    # SDL3 backend (gfx_sdl2.cpp) is now needed for iOS Metal rendering
+    # list(FILTER Source_Files__Graphic EXCLUDE REGEX "graphic/Fast3D/backends/gfx_sdl2*")
 endif()
 
 source_group("graphic" FILES ${Source_Files__Graphic})
@@ -228,11 +236,16 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     find_library(QUARTZCORE QuartzCore)
     target_link_libraries(libultraship PRIVATE ${OSX_FOUNDATION} ${OSX_AVFOUNDATION} ${METAL} ${QUARTZCORE} ${CMAKE_DL_LIBS})
 
-    # Add UniformTypeIdentifiers framework for iOS (required by file picker)
+    # Add UniformTypeIdentifiers and UIKit frameworks for iOS (required by file picker)
     if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
         find_library(UNIFORM_TYPE_IDENTIFIERS UniformTypeIdentifiers)
         if (UNIFORM_TYPE_IDENTIFIERS)
             target_link_libraries(libultraship PRIVATE ${UNIFORM_TYPE_IDENTIFIERS})
+        endif()
+
+        find_library(UIKIT UIKit)
+        if (UIKIT)
+            target_link_libraries(libultraship PRIVATE ${UIKIT})
         endif()
     endif()
 endif()
@@ -288,6 +301,13 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
 
         if(TARGET SDL2)
             set_target_properties(SDL2 PROPERTIES
+                XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
+                XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
+            )
+        endif()
+
+        if(TARGET SDL3)
+            set_target_properties(SDL3 PROPERTIES
                 XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
                 XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
             )

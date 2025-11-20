@@ -1,16 +1,6 @@
 include(FetchContent)
 
-#=================== SDL2 ===================
-find_package(SDL2 QUIET)
-if (NOT ${SDL2_FOUND})
-    FetchContent_Declare(
-        SDL2
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG release-2.28.1
-        OVERRIDE_FIND_PACKAGE
-    )
-    FetchContent_MakeAvailable(SDL2)
-endif()
+# Note: SDL3 is now fetched in common.cmake before ImGui configuration
 
 #=================== nlohmann-json ===================
 find_package(nlohmann_json QUIET)
@@ -59,6 +49,16 @@ if (NOT ${libzip_FOUND})
     set(BUILD_DOC OFF)
     set(BUILD_OSSFUZZ OFF)
     set(BUILD_SHARED_LIBS OFF)
+
+    # Disable Microsoft-specific secure functions for iOS compatibility
+    # libzip incorrectly detects these functions as available on iOS,
+    # but they don't work correctly outside Visual Studio
+    set(HAVE_MEMCPY_S OFF CACHE BOOL "Disable memcpy_s for iOS" FORCE)
+    set(HAVE_STRNCPY_S OFF CACHE BOOL "Disable strncpy_s for iOS" FORCE)
+    set(HAVE_STRERROR_S OFF CACHE BOOL "Disable strerror_s for iOS" FORCE)
+    set(HAVE_STRERRORLEN_S OFF CACHE BOOL "Disable strerrorlen_s for iOS" FORCE)
+    set(HAVE_SNPRINTF_S OFF CACHE BOOL "Disable snprintf_s for iOS" FORCE)
+
     FetchContent_Declare(
         libzip
         GIT_REPOSITORY https://github.com/nih-at/libzip.git
@@ -87,4 +87,4 @@ target_sources(ImGui
 target_include_directories(ImGui PRIVATE ${metalcpp_SOURCE_DIR})
 target_compile_definitions(ImGui PUBLIC IMGUI_IMPL_METAL_CPP)
 
-target_link_libraries(ImGui PUBLIC SDL2::SDL2-static SDL2::SDL2main)
+target_link_libraries(ImGui PUBLIC SDL3::SDL3)

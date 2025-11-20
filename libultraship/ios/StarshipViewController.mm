@@ -51,16 +51,24 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    NSLog(@"[TouchButton] touchesBegan called on button at position %@", NSStringFromCGPoint(self.frame.origin));
     self.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.5];
     if (self.onPress) {
+        NSLog(@"[TouchButton] Calling onPress callback for button at position %@", NSStringFromCGPoint(self.frame.origin));
         self.onPress();
+    } else {
+        NSLog(@"[TouchButton] WARNING: onPress callback is NULL for button at position %@", NSStringFromCGPoint(self.frame.origin));
     }
 }
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    NSLog(@"[TouchButton] touchesEnded called on button at position %@", NSStringFromCGPoint(self.frame.origin));
     self.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.2];
     if (self.onRelease) {
+        NSLog(@"[TouchButton] Calling onRelease callback for button at position %@", NSStringFromCGPoint(self.frame.origin));
         self.onRelease();
+    } else {
+        NSLog(@"[TouchButton] WARNING: onRelease callback is NULL for button at position %@", NSStringFromCGPoint(self.frame.origin));
     }
 }
 
@@ -259,7 +267,8 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.view.backgroundColor = [UIColor blackColor];
+    NSLog(@"[StarshipViewController] ===== VIEWDIDLOAD BUILD 2025-01-20-14:30 =====");
+    self.view.backgroundColor = [UIColor clearColor];  // Transparent to show SDL rendering below
     self.usingTouchControls = YES;
     self.sdlControllerInitialized = NO;
 
@@ -279,13 +288,11 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
     // Setup motion controls for gyroscope input
     [self setupMotionControls];
 
-    // Note: iOS_AttachController() will be called after SDL initializes
-    // via delayed initialization to ensure SDL's joystick subsystem is ready
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        iOS_AttachController();
-        self.sdlControllerInitialized = YES;
-        NSLog(@"[iOS] SDL controller initialized and attached");
-    });
+    // Attach virtual controller immediately to avoid race condition with touch controls
+    // Touch controls start firing events right after setupTouchControls, so the controller must be ready
+    iOS_AttachController();
+    self.sdlControllerInitialized = YES;
+    NSLog(@"[iOS] SDL controller initialized and attached");
 }
 
 - (void)dealloc {
@@ -354,8 +361,14 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
         aButtonTop,
         largeButtonSize, largeButtonSize
     )];
-    aButton.onPress = ^{ iOS_SetButton(IOS_BUTTON_A, true); };
-    aButton.onRelease = ^{ iOS_SetButton(IOS_BUTTON_A, false); };
+    aButton.onPress = ^{
+        NSLog(@"[A Button] onPress callback executed - calling iOS_SetButton(IOS_BUTTON_A=0, true)");
+        iOS_SetButton(IOS_BUTTON_A, true);
+    };
+    aButton.onRelease = ^{
+        NSLog(@"[A Button] onRelease callback executed - calling iOS_SetButton(IOS_BUTTON_A=0, false)");
+        iOS_SetButton(IOS_BUTTON_A, false);
+    };
     [self.touchControlsContainer addSubview:aButton];
 
     UILabel *aLabel = [[UILabel alloc] initWithFrame:aButton.bounds];
@@ -525,8 +538,9 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
         margin + 10, margin + safeAreaInset + 10,
         cButtonSmallSize, cButtonSmallSize
     )];
-    cUp.onPress = ^{ iOS_SetButton(IOS_BUTTON_DPAD_UP, true); };
-    cUp.onRelease = ^{ iOS_SetButton(IOS_BUTTON_DPAD_UP, false); };
+    // CRITICAL FIX: CAM button uses right stick Y axis (negative direction), NOT D-pad
+    cUp.onPress = ^{ iOS_SetAxis(IOS_AXIS_RIGHTY, -32767); };
+    cUp.onRelease = ^{ iOS_SetAxis(IOS_AXIS_RIGHTY, 0); };
     cUp.layer.cornerRadius = cButtonSmallSize / 2;
     cUp.alpha = 0.5;  // Semi-transparent
     [self.touchControlsContainer addSubview:cUp];
@@ -544,8 +558,9 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
         margin + 10 + cButtonSmallSize + 10, margin + safeAreaInset + 10,
         cButtonSmallSize, cButtonSmallSize
     )];
-    cRight.onPress = ^{ iOS_SetButton(IOS_BUTTON_DPAD_RIGHT, true); };
-    cRight.onRelease = ^{ iOS_SetButton(IOS_BUTTON_DPAD_RIGHT, false); };
+    // CRITICAL FIX: MSG button uses right stick X axis (positive direction), NOT D-pad
+    cRight.onPress = ^{ iOS_SetAxis(IOS_AXIS_RIGHTX, 32767); };
+    cRight.onRelease = ^{ iOS_SetAxis(IOS_AXIS_RIGHTX, 0); };
     cRight.layer.cornerRadius = cButtonSmallSize / 2;
     cRight.alpha = 0.5;  // Semi-transparent
     [self.touchControlsContainer addSubview:cRight];
@@ -612,8 +627,14 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
     )];
     startButton.layer.cornerRadius = 8;
     startButton.alpha = 0.5;  // Semi-transparent
-    startButton.onPress = ^{ iOS_SetButton(IOS_BUTTON_START, true); };
-    startButton.onRelease = ^{ iOS_SetButton(IOS_BUTTON_START, false); };
+    startButton.onPress = ^{
+        NSLog(@"[START Button] onPress callback executed - calling iOS_SetButton(IOS_BUTTON_START=6, true)");
+        iOS_SetButton(IOS_BUTTON_START, true);
+    };
+    startButton.onRelease = ^{
+        NSLog(@"[START Button] onRelease callback executed - calling iOS_SetButton(IOS_BUTTON_START=6, false)");
+        iOS_SetButton(IOS_BUTTON_START, false);
+    };
     [self.touchControlsContainer addSubview:startButton];
 
     UILabel *startLabel = [[UILabel alloc] initWithFrame:startButton.bounds];
@@ -657,6 +678,10 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
     settingsLabel.font = [UIFont systemFontOfSize:28];
     settingsLabel.userInteractionEnabled = NO;
     [settingsButton addSubview:settingsLabel];
+
+    // Add touch controls container to the view hierarchy
+    [self.view addSubview:self.touchControlsContainer];
+    NSLog(@"[iOS] Added touch controls container to view hierarchy");
 
     // Explicitly show touch controls by default
     self.touchControlsContainer.hidden = NO;

@@ -18,6 +18,10 @@
 #include <cmath>
 #include <stddef.h>
 
+#ifdef __IOS__
+#include <objc/message.h>
+#endif
+
 #ifndef _LANGUAGE_C
 #define _LANGUAGE_C
 #endif
@@ -27,7 +31,7 @@
 #define MTL_PRIVATE_IMPLEMENTATION
 #include <Metal/Metal.hpp>
 
-#include <SDL_render.h>
+#include <SDL3/SDL_render.h>
 #include <imgui_impl_metal.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/fmt.h>
@@ -73,8 +77,17 @@ bool GfxRenderingAPIMetal::MetalInit(SDL_Renderer* renderer) {
     mRenderer = renderer;
     NS::AutoreleasePool* autorelease_pool = NS::AutoreleasePool::alloc()->init();
 
-    mLayer = (CA::MetalLayer*)SDL_RenderGetMetalLayer(renderer);
+    mLayer = (CA::MetalLayer*)SDL_GetRenderMetalLayer(renderer);
     mLayer->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+
+#ifdef __IOS__
+    // iOS requires presentsWithTransaction=false for proper display updates
+    // Use Objective-C runtime to call the method since Metal-cpp doesn't wrap it
+    typedef void (*SetBoolFunc)(void*, SEL, BOOL);
+    SetBoolFunc setPresentsWithTransaction = (SetBoolFunc)objc_msgSend;
+    setPresentsWithTransaction((void*)mLayer, sel_registerName("setPresentsWithTransaction:"), NO);
+    SPDLOG_INFO("[Metal] iOS: Set presentsWithTransaction=false for layer");
+#endif
 
     mDevice = mLayer->device();
     mCommandQueue = mDevice->newCommandQueue();
@@ -94,7 +107,7 @@ static void SetupScreenFramebuffer(uint32_t width, uint32_t height);
 
 void GfxRenderingAPIMetal::NewFrame() {
     int width, height;
-    SDL_GetRendererOutputSize(mRenderer, &width, &height);
+    SDL_GetRenderOutputSize(mRenderer, &width, &height);
     SetupScreenFramebuffer(width, height);
 
     MTL::RenderPassDescriptor* current_render_pass = mFramebuffers[0].mRenderPassDescriptor;
@@ -541,9 +554,17 @@ void GfxRenderingAPIMetal::EndFrame() {
 
     auto screen_framebuffer = mFramebuffers[0];
     screen_framebuffer.mCommandEncoder->endEncoding();
-    screen_framebuffer.mCommandBuffer->presentDrawable(mCurrentDrawable);
+
+    if (!mCurrentDrawable) {
+        SPDLOG_ERROR("[Metal] EndFrame: No current drawable to present!");
+    } else {
+        SPDLOG_INFO("[Metal] EndFrame: Presenting drawable");
+        screen_framebuffer.mCommandBuffer->presentDrawable(mCurrentDrawable);
+    }
+
     mCurrentVertexBufferPoolIndex = (mCurrentVertexBufferPoolIndex + 1) % kMaxVertexBufferPoolSize;
     screen_framebuffer.mCommandBuffer->commit();
+    SPDLOG_INFO("[Metal] EndFrame: Command buffer committed");
 
     mDrawnFramebuffers.clear();
 
@@ -598,6 +619,13 @@ void GfxRenderingAPIMetal::SetupScreenFramebuffer(uint32_t width, uint32_t heigh
     mCurrentDrawable = nullptr;
     mCurrentDrawable = mLayer->nextDrawable();
 
+    if (!mCurrentDrawable) {
+        SPDLOG_ERROR("[Metal] Failed to get next drawable from layer!");
+        return;
+    }
+
+    SPDLOG_INFO("[Metal] Got drawable, size: {}x{}", width, height);
+
     bool msaa_enabled = CVarGetInteger("gMSAAValue", 1) > 1;
 
     FramebufferMetal& fb = mFramebuffers[0];
@@ -612,7 +640,9 @@ void GfxRenderingAPIMetal::SetupScreenFramebuffer(uint32_t width, uint32_t heigh
 
     MTL::RenderPassDescriptor* render_pass_descriptor = MTL::RenderPassDescriptor::renderPassDescriptor();
     render_pass_descriptor->colorAttachments()->object(0)->setTexture(tex.texture);
+
     render_pass_descriptor->colorAttachments()->object(0)->setLoadAction(MTL::LoadActionLoad);
+
     render_pass_descriptor->colorAttachments()->object(0)->setStoreAction(MTL::StoreActionStore);
 
     tex.width = width;
@@ -662,7 +692,7 @@ void GfxRenderingAPIMetal::UpdateFramebufferParameters(int fb_id, uint32_t width
     // see `SetupScreenFramebuffer`.
     if (fb_id == 0) {
         int width, height;
-        SDL_GetRendererOutputSize(mRenderer, &width, &height);
+        SDL_GetRenderOutputSize(mRenderer, &width, &height);
         mLayer->setDrawableSize({ CGFloat(width), CGFloat(height) });
 
         return;
