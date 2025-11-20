@@ -3,6 +3,23 @@
 
 # Starship
 
+## iOS Port
+
+This is an iOS port of Starship (Star Fox 64), forked from the Android port developed by the HarbourMasters team. This port brings native iOS support with touch controls, gyroscope flight controls, and Metal rendering.
+
+**Key Features:**
+* Touch Controls: Full on-screen virtual joystick overlay
+* Gyroscope Controls: Attitude-based gyro aiming using CoreMotion
+* Metal Rendering: Native Metal graphics backend for iOS
+* SDL3 Integration: Virtual joystick with button/axis state caching
+
+**Credits:**
+* Original Starship Team: [HarbourMasters/Starship](https://github.com/HarbourMasters/Starship) - Lead developers SonicDcer and Lywx
+* Android Port: This iOS port is based on the Android port foundation
+* iOS Port: Alex Nesta ([@alexvnesta](https://github.com/alexvnesta))
+
+---
+
 Lead Developers: 
 * [SonicDcer](https://www.github.com/sonicdcer)
 * [Lywx](https://www.github.com/kiritodv)
