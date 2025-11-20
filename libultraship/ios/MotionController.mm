@@ -56,11 +56,11 @@
         // Default settings for attitude-based mode
         _mode = MotionControlModeAttitude;
         _enabled = YES;
-        _sensitivity = 20.0;     // Degrees of tilt for full deflection (±20° = ±1.0)
+        _sensitivity = 15.0;     // Degrees of tilt for full deflection (±15° = ±1.0, reduced for more sensitivity)
         _invertPitch = YES;      // Inverted for correct pitch direction in landscape mode
         _invertRoll = YES;       // Inverted to match original working behavior
-        _deadzone = 0.5;         // Small deadzone (0.5 degrees) for progressive feel
-        _responseCurve = 2.0;    // Squared response curve (progressive sensitivity)
+        _deadzone = 0.2;         // Smaller deadzone (0.2 degrees) for immediate response
+        _responseCurve = 1.7;    // Reduced curve (1.7) for more linear response from slight movements
 
         // Initialize current axis values
         _currentAxisX = 0.0;
@@ -76,7 +76,7 @@
         _gyroCalibrationY = 0.0;
         _lastUpdateTime = nil;
 
-        NSLog(@"[MotionController] Initialized in Attitude mode - Sensitivity: %.1f degrees for full deflection", _sensitivity);
+        NSLog(@"[MotionController] Initialized in Attitude mode - Sensitivity: %.1f°, Deadzone: %.1f°, Curve: %.1f", _sensitivity, _deadzone, _responseCurve);
 
         // Load settings from CVars
         [self loadSettingsFromCVars];
@@ -154,7 +154,7 @@
     self.invertPitch = CVarGetInteger("gGyroInvertPitch", 1);
     self.invertRoll = CVarGetInteger("gGyroInvertRoll", 1);
 
-    NSLog(@"[MotionController] Loaded settings from CVars - Enabled: %d, Sensitivity: %.1f, Deadzone: %.2f, Curve: %.1f",
+    NSLog(@"[MotionController] Loaded settings from CVars - Enabled: %d, Sensitivity: %.1f°, Deadzone: %.1f°, Curve: %.1f",
           self.enabled, self.sensitivity, self.deadzone, self.responseCurve);
 }
 
