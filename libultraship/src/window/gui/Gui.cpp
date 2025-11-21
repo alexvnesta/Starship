@@ -507,9 +507,12 @@ void Gui::DrawMenu() {
                                    ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
                                    ImGuiWindowFlags_NoResize;
 
+    // On iOS, we use a popup menu instead of a menu bar, so don't add the MenuBar flag
+#ifndef __IOS__
     if (GetMenuBar() && GetMenuBar()->IsVisible()) {
         windowFlags |= ImGuiWindowFlags_MenuBar;
     }
+#endif
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);

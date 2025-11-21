@@ -939,6 +939,57 @@ void DrawDebugMenu() {
 }
 
 void GameMenuBar::DrawElement() {
+#ifdef __IOS__
+    // On iOS, use a touch-friendly popup menu instead of menu bar
+    static bool menuJustOpened = false;
+
+    // Check if menu was just made visible - if so, open the popup
+    if (IsVisible() && !ImGui::IsPopupOpen("SettingsPopup")) {
+        ImGui::OpenPopup("SettingsPopup");
+        menuJustOpened = true;
+    }
+
+    // Center the popup on screen
+    ImGuiIO& io = ImGui::GetIO();
+    ImVec2 center = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
+    ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+
+    // Make the popup scrollable and sized appropriately for touch
+    ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.85f, io.DisplaySize.y * 0.8f), ImGuiCond_Always);
+
+    if (ImGui::BeginPopup("SettingsPopup", ImGuiWindowFlags_NoMove)) {
+        // Add a close button at the top
+        if (ImGui::Button("Close", ImVec2(-1, 50))) {
+            ImGui::CloseCurrentPopup();
+            ToggleVisibility();  // Hide the menu
+        }
+
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // Draw all menu sections expanded in the popup
+        // Use CollapsingHeader for each section so they can be expanded/collapsed
+        DrawGameMenu();
+
+        ImGui::Spacing();
+        DrawSettingsMenu();
+
+        ImGui::Spacing();
+        DrawEnhancementsMenu();
+
+        ImGui::Spacing();
+        DrawCheatsMenu();
+
+        ImGui::Spacing();
+        DrawDebugMenu();
+
+        ImGui::EndPopup();
+    } else if (!ImGui::IsPopupOpen("SettingsPopup") && IsVisible()) {
+        // Popup was closed - hide the menu
+        ToggleVisibility();
+    }
+#else
+    // On desktop/other platforms, use the standard menu bar
     if(ImGui::BeginMenuBar()){
         DrawMenuBarIcon();
 
@@ -964,4 +1015,5 @@ void GameMenuBar::DrawElement() {
 
         ImGui::EndMenuBar();
     }
+#endif
 }
