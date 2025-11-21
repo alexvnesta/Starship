@@ -309,7 +309,7 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
             }
 
             if (fName[0] == '>' && fName[1] == '0' && fName[2] == 'x') {
-                int offset = strtol(fName.c_str() + 1, NULL, 16);
+                int offset = static_cast<int>(strtol(fName.c_str() + 1, NULL, 16));
                 g = gsSPMatrix(offset | 1, paramInt);
             } else {
                 g = { gsSPMatrix(0, paramInt) };
@@ -503,7 +503,7 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
             uint32_t width = child->IntAttribute("Width");
 
             if (fName[0] == '>' && fName[1] == '0' && (fName[2] == 'x' || fName[2] == 'X')) {
-                uint32_t seg = std::stoul(fName.substr(1), nullptr, 16);
+                uint32_t seg = static_cast<uint32_t>(std::stoul(fName.substr(1), nullptr, 16));
                 g = { gsDPSetTextureImage(fmtVal, sizVal, width, seg | 1) };
             } else {
                 g = { gsDPSetTextureImage(fmtVal, sizVal, width, 0) };

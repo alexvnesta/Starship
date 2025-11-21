@@ -207,7 +207,7 @@ int32_t ConsoleWindow::SetCommand(std::shared_ptr<Console> console, const std::v
     } else if (vType == VARTYPE_FLOAT) {
         CVarSetFloat((char*)args[1].c_str(), std::stof(args[2]));
     } else if (vType == VARTYPE_RGBA) {
-        uint32_t val = std::stoul(&args[2].c_str()[1], nullptr, 16);
+        uint32_t val = static_cast<uint32_t>(std::stoul(&args[2].c_str()[1], nullptr, 16));
         Color_RGBA8 clr;
         clr.r = val >> 24;
         clr.g = val >> 16;
