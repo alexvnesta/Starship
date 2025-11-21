@@ -32,7 +32,7 @@ void Ship::BinaryReader::Seek(int32_t offset, SeekOffsetType seekType) {
 }
 
 uint32_t Ship::BinaryReader::GetBaseAddress() {
-    return mStream->GetBaseAddress();
+    return static_cast<uint32_t>(mStream->GetBaseAddress());
 }
 
 void Ship::BinaryReader::Read(int32_t length) {

@@ -1011,7 +1011,7 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
         } else if (childName == "JumpToDisplayList") {
             std::string dlPath = (char*)child->Attribute("Path");
             if (dlPath[0] == '>' && dlPath[1] == '0' && (dlPath[2] == 'x' || dlPath[2] == 'X')) {
-                uint32_t seg = std::stoul(dlPath.substr(1), nullptr, 16);
+                uint32_t seg = static_cast<uint32_t>(std::stoul(dlPath.substr(1), nullptr, 16));
                 g = { gsSPBranchListOTRHash(seg | 1) };
             } else {
                 char* dlPath2 = (char*)malloc(strlen(dlPath.c_str()) + 1);
@@ -1023,7 +1023,7 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
         } else if (childName == "CallDisplayList") {
             std::string dlPath = (char*)child->Attribute("Path");
             if (dlPath[0] == '>' && dlPath[1] == '0' && (dlPath[2] == 'x' || dlPath[2] == 'X')) {
-                uint32_t seg = std::stoul(dlPath.substr(1), nullptr, 16);
+                uint32_t seg = static_cast<uint32_t>(std::stoul(dlPath.substr(1), nullptr, 16));
                 g = { gsSPDisplayList(seg | 1) };
             } else {
                 char* dlPath2 = (char*)malloc(strlen(dlPath.c_str()) + 1);

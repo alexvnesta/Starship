@@ -33,7 +33,7 @@ void GameOverlay::LoadFont(const std::string& name, float fontSize, const Resour
         return;
     }
 
-    mFonts[name] = io.Fonts->AddFontFromMemoryTTF(font->Data, font->DataSize, fontSize);
+    mFonts[name] = io.Fonts->AddFontFromMemoryTTF(font->Data, static_cast<int>(font->DataSize), fontSize);
 }
 
 void GameOverlay::LoadFont(const std::string& name, float fontSize, const std::string& path) {
@@ -51,7 +51,7 @@ void GameOverlay::LoadFont(const std::string& name, float fontSize, const std::s
         return;
     }
 
-    mFonts[name] = io.Fonts->AddFontFromMemoryTTF(font->Data, font->DataSize, fontSize);
+    mFonts[name] = io.Fonts->AddFontFromMemoryTTF(font->Data, static_cast<int>(font->DataSize), fontSize);
 }
 
 void GameOverlay::TextDraw(float x, float y, bool shadow, ImVec4 color, const char* fmt, ...) {

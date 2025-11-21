@@ -470,12 +470,12 @@ void ConsoleWindow::DrawElement() {
             ImGui::PushStyleColor(ImGuiCol_Text, mPriorityColours[line.Priority]);
             if (ImGui::Selectable(id.c_str(), isSelected)) {
                 if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) && !isSelected) {
-                    mSelectedEntries.push_back(i);
+                    mSelectedEntries.push_back(static_cast<int>(i));
 
                 } else {
                     mSelectedEntries.clear();
                 }
-                mSelectedId = isSelected ? -1 : i;
+                mSelectedId = isSelected ? -1 : static_cast<int32_t>(i);
             }
             ImGui::PopStyleColor();
             if (isSelected) {

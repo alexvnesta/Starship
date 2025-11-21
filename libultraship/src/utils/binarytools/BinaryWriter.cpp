@@ -133,7 +133,7 @@ void Ship::BinaryWriter::Write(double value) {
 }
 
 void Ship::BinaryWriter::Write(const std::string& str) {
-    int strLen = str.size();
+    int strLen = static_cast<int>(str.size());
     Write(strLen);
 
     for (char c : str) {
