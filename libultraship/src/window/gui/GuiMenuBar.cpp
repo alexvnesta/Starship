@@ -1,6 +1,10 @@
 #include "window/gui/GuiMenuBar.h"
 #include "libultraship/libultraship.h"
 
+#if defined(__IOS__)
+extern "C" void iOS_SetMenuOpen(bool menuOpen);
+#endif
+
 namespace Ship {
 GuiMenuBar::GuiMenuBar(const std::string& visibilityConsoleVariable, bool isVisible)
     : GuiElement(isVisible), mVisibilityConsoleVariable(visibilityConsoleVariable) {
@@ -43,6 +47,10 @@ void GuiMenuBar::SyncVisibilityConsoleVariable() {
 
 void GuiMenuBar::SetVisibility(bool visible) {
     mIsVisible = visible;
+#if defined(__IOS__)
+    // On iOS, control touch controls overlay based on menu visibility
+    iOS_SetMenuOpen(visible);
+#endif
     SyncVisibilityConsoleVariable();
 }
 } // namespace Ship

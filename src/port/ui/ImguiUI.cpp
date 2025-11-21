@@ -19,6 +19,10 @@
 #include <port/switch/SwitchPerformanceProfiles.h>
 #endif
 
+#ifdef __IOS__
+#include "libultraship/ios/StarshipBridge.h"
+#endif
+
 extern "C" {
 #include "sys.h"
 #include <sf64audio_provisional.h>
@@ -940,52 +944,52 @@ void DrawDebugMenu() {
 
 void GameMenuBar::DrawElement() {
 #ifdef __IOS__
-    // On iOS, use a touch-friendly popup menu instead of menu bar
-    static bool menuJustOpened = false;
+    // On iOS, use a touch-friendly window instead of menu bar
+    // Note: iOS_SetMenuOpen is called from GuiMenuBar::SetVisibility()
+    // This method is only called when IsVisible() is true (see GuiMenuBar::Draw)
 
-    // Check if menu was just made visible - if so, open the popup
-    if (IsVisible() && !ImGui::IsPopupOpen("SettingsPopup")) {
-        ImGui::OpenPopup("SettingsPopup");
-        menuJustOpened = true;
-    }
-
-    // Center the popup on screen
     ImGuiIO& io = ImGui::GetIO();
+
+    // Center the window on screen
     ImVec2 center = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
     ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-
-    // Make the popup scrollable and sized appropriately for touch
     ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.85f, io.DisplaySize.y * 0.8f), ImGuiCond_Always);
 
-    if (ImGui::BeginPopup("SettingsPopup", ImGuiWindowFlags_NoMove)) {
-        // Add a close button at the top
-        if (ImGui::Button("Close", ImVec2(-1, 50))) {
-            ImGui::CloseCurrentPopup();
-            ToggleVisibility();  // Hide the menu
+    // Set solid background color for iOS menu
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+
+    // Use a regular window with scroll support - works better with touch than popups
+    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+                                    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar;
+
+    bool windowOpen = true;
+    if (ImGui::Begin("iOS Settings Menu", &windowOpen, windowFlags)) {
+        // Large close button at top for easy touch
+        if (ImGui::Button("Close Menu", ImVec2(-1, 60))) {
+            ToggleVisibility();
         }
 
         ImGui::Separator();
         ImGui::Spacing();
 
-        // Draw all menu sections expanded in the popup
-        // Use CollapsingHeader for each section so they can be expanded/collapsed
+        // Draw all menu sections
         DrawGameMenu();
-
         ImGui::Spacing();
         DrawSettingsMenu();
-
         ImGui::Spacing();
         DrawEnhancementsMenu();
-
         ImGui::Spacing();
         DrawCheatsMenu();
-
         ImGui::Spacing();
         DrawDebugMenu();
+    }
+    ImGui::End();
 
-        ImGui::EndPopup();
-    } else if (!ImGui::IsPopupOpen("SettingsPopup") && IsVisible()) {
-        // Popup was closed - hide the menu
+    ImGui::PopStyleColor(2);
+
+    // If window was closed via X button
+    if (!windowOpen) {
         ToggleVisibility();
     }
 #else
