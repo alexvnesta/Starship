@@ -11,6 +11,11 @@ GuiMenuBar::GuiMenuBar(const std::string& visibilityConsoleVariable, bool isVisi
     if (!mVisibilityConsoleVariable.empty()) {
         mIsVisible = CVarGetInteger(mVisibilityConsoleVariable.c_str(), mIsVisible);
         SyncVisibilityConsoleVariable();
+#if defined(__IOS__)
+        // Sync iOS touch controls state with menu visibility on startup
+        SPDLOG_INFO("[GuiMenuBar] Constructor calling iOS_SetMenuOpen with mIsVisible={}", mIsVisible);
+        iOS_SetMenuOpen(mIsVisible);
+#endif
     }
 }
 
@@ -46,9 +51,11 @@ void GuiMenuBar::SyncVisibilityConsoleVariable() {
 }
 
 void GuiMenuBar::SetVisibility(bool visible) {
+    SPDLOG_INFO("[GuiMenuBar] SetVisibility called with visible={}", visible);
     mIsVisible = visible;
 #if defined(__IOS__)
     // On iOS, control touch controls overlay based on menu visibility
+    SPDLOG_INFO("[GuiMenuBar] SetVisibility calling iOS_SetMenuOpen with visible={}", visible);
     iOS_SetMenuOpen(visible);
 #endif
     SyncVisibilityConsoleVariable();

@@ -118,6 +118,17 @@ void iOS_IntegrateSDLView(void* sdlWindow);
 #define IOS_CAMERA_YAW   0  // Horizontal rotation
 #define IOS_CAMERA_PITCH 1  // Vertical rotation
 
+// ============================================================================
+// Menu State Functions
+// ============================================================================
+
+/**
+ * Set whether the ImGui menu is currently visible
+ * When visible, touch controls overlay passes touches through to SDL/ImGui
+ * @param menuOpen True if menu is visible, false otherwise
+ */
+void iOS_SetMenuOpen(bool menuOpen);
+
 #ifdef __cplusplus
 }
 #endif

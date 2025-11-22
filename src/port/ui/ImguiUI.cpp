@@ -965,24 +965,36 @@ void GameMenuBar::DrawElement() {
 
     bool windowOpen = true;
     if (ImGui::Begin("iOS Settings Menu", &windowOpen, windowFlags)) {
-        // Large close button at top for easy touch
-        if (ImGui::Button("Close Menu", ImVec2(-1, 60))) {
+        // Large close button at top for easy touch - centered with padding
+        ImGui::Spacing();
+        ImGui::Indent(20.0f);
+        float buttonWidth = ImGui::GetContentRegionAvail().x - 40.0f;
+        if (ImGui::Button("Close Menu", ImVec2(buttonWidth, 50))) {
             ToggleVisibility();
         }
+        ImGui::Unindent(20.0f);
 
+        ImGui::Spacing();
+        ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
+        ImGui::Spacing();
 
-        // Draw all menu sections
+        // Draw all menu sections with proper spacing
         DrawGameMenu();
+        ImGui::Spacing();
         ImGui::Spacing();
         DrawSettingsMenu();
         ImGui::Spacing();
+        ImGui::Spacing();
         DrawEnhancementsMenu();
+        ImGui::Spacing();
         ImGui::Spacing();
         DrawCheatsMenu();
         ImGui::Spacing();
+        ImGui::Spacing();
         DrawDebugMenu();
+        ImGui::Spacing();
     }
     ImGui::End();
 

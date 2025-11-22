@@ -660,11 +660,26 @@ static const BOOL SHOW_GYRO_DEBUG = NO;
     settingsButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.6].CGColor;
 
     // Toggle menu visibility on press
+    __weak typeof(self) weakVC = self;
     settingsButton.onPress = ^{
         // Get the menu bar and toggle its visibility
         auto gui = Ship::Context::GetInstance()->GetWindow()->GetGui();
         if (gui && gui->GetMenuBar()) {
+            bool isMenuVisible = gui->GetMenuBar()->IsVisible();
             gui->GetMenuBar()->ToggleVisibility();
+
+            // Hide touch controls when menu opens, show when it closes
+            // Note: Since settingsButton is in touchControlsContainer, it will also be hidden
+            // But the menu has a "Close" button, so users can still close it
+            __strong typeof(weakVC) strongVC = weakVC;
+            if (strongVC) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    // Toggle controls visibility opposite to menu visibility
+                    strongVC.touchControlsContainer.hidden = !isMenuVisible;
+                    NSLog(@"[iOS] Menu toggled. Controls now %@",
+                          strongVC.touchControlsContainer.hidden ? @"hidden" : @"visible");
+                });
+            }
         }
     };
     settingsButton.onRelease = ^{
