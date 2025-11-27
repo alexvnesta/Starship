@@ -55,6 +55,10 @@
 #include <port/switch/SwitchImpl.h>
 #endif
 
+#ifdef __IOS__
+#include "ios/GameCenterHooks.h"
+#endif
+
 namespace fs = std::filesystem;
 
 extern "C" {
@@ -451,6 +455,10 @@ void GameEngine::Destroy() {
 }
 
 void GameEngine::StartFrame() const {
+#ifdef __IOS__
+    GameCenter_Update();
+#endif
+
     using Ship::KbScancode;
     const int32_t dwScancode = this->context->GetWindow()->GetLastScancode();
     this->context->GetWindow()->SetLastScancode(-1);

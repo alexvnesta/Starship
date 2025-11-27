@@ -151,6 +151,8 @@ file(GLOB_RECURSE ALL_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
     "src/port/*.h"
     "src/port/*.c"
     "src/port/*.cpp"
+    "src/port/ios/*.h"
+    "src/port/ios/*.cpp"
     "src/sys/*.c"
     "src/sys/*.h"
     "src/1FA60.c"

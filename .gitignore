@@ -60,6 +60,8 @@ Starship.log
 dumps/
 _packages/*
 *.DS_Store
+xcuserdata/
+*.xcworkspace/
 src/jp/
 src/eu/
 src/cn/
