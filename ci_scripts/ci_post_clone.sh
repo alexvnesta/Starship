@@ -6,6 +6,8 @@
 # This script runs after Xcode Cloud clones the repository.
 # It generates the Xcode project using CMake for iOS builds.
 #
+# Version: 1.0.0 - Initial CI setup test
+#
 
 set -e  # Exit on error
 
