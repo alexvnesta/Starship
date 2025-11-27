@@ -4,42 +4,49 @@
 # Xcode Cloud post-clone script
 #
 # This script runs after Xcode Cloud clones the repository.
-# The Xcode project is pre-generated and committed to avoid CI timeouts.
-# We fix the hardcoded paths at runtime since CMake embeds absolute paths.
+# It runs CMake to download dependencies and generate the Xcode project.
+# The post_clone phase has a 25-minute timeout which should be sufficient.
 #
 
 set -e  # Exit on error
 
 echo "=== Starship Xcode Cloud Build Setup ==="
 echo "Working directory: $(pwd)"
+echo "Start time: $(date)"
 
 # Navigate to repository root
 cd "$CI_PRIMARY_REPOSITORY_PATH"
 echo "Repository path: $CI_PRIMARY_REPOSITORY_PATH"
 
-# Verify the pre-generated Xcode project exists
+# Install CMake if not available
+if ! command -v cmake &> /dev/null; then
+    echo "Installing CMake via Homebrew..."
+    brew install cmake
+fi
+
+echo "CMake version: $(cmake --version | head -1)"
+
+# Generate Xcode project with CMake
+# This downloads all dependencies and creates the project
+echo "=== Running CMake to generate Xcode project ==="
+echo "This may take several minutes to download dependencies..."
+
+cmake -G Xcode \
+    -B . \
+    -DCMAKE_TOOLCHAIN_FILE=cmake/ios.toolchain.cmake \
+    -DPLATFORM=OS64 \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
+    -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON
+
+echo "✅ CMake configuration complete"
+echo "End time: $(date)"
+
+# Verify the project was generated
 if [ -f "Starship.xcodeproj/project.pbxproj" ]; then
-    echo "✅ Pre-generated Xcode project found"
-
-    # Fix hardcoded paths from local development machine to CI path
-    # CMake embeds absolute paths, so we need to replace them at build time
-    echo "Fixing hardcoded paths for CI environment..."
-
-    # Replace the local dev path with the CI repository path
-    sed -i '' "s|/Users/alex/development/Starship|${CI_PRIMARY_REPOSITORY_PATH}|g" Starship.xcodeproj/project.pbxproj
-
-    echo "✅ Paths updated for CI"
-
-    # Verify the project is still valid
-    if plutil -lint Starship.xcodeproj/project.pbxproj > /dev/null 2>&1; then
-        echo "✅ Project file validated"
-    else
-        echo "⚠️ Warning: Project file may have issues"
-    fi
+    echo "✅ Xcode project generated successfully"
+    ls -la Starship.xcodeproj/
 else
-    echo "❌ ERROR: Starship.xcodeproj not found!"
-    echo "The Xcode project should be pre-generated and committed to the repository."
-    echo "Run: cmake -G Xcode -B . -DCMAKE_TOOLCHAIN_FILE=cmake/ios.toolchain.cmake -DPLATFORM=OS64"
+    echo "❌ ERROR: Xcode project was not generated!"
     exit 1
 fi
 
