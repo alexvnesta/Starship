@@ -206,6 +206,16 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
             $<TARGET_FILE_DIR:${PROJECT_NAME}>/starship.o2r
         COMMENT "Copying O2R files to app bundle"
     )
+
+    # Copy mods folder if it exists
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/mods)
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_CURRENT_SOURCE_DIR}/mods
+                $<TARGET_FILE_DIR:${PROJECT_NAME}>/mods
+            COMMENT "Copying mods folder to app bundle"
+        )
+    endif()
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     add_library(${PROJECT_NAME} SHARED ${ALL_FILES})
 else()

@@ -113,6 +113,14 @@ void Gui::Init(GuiWindowInitData windowImpl) {
     mImGuiIo = &ImGui::GetIO();
     mImGuiIo->ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_NoMouseCursorChange;
 
+#ifdef __IOS__
+    // iOS: Enable mouse support for touch input - this allows hover detection to work
+    // By default, ImGui disables hover on touch-only devices, but we need it for menus
+    mImGuiIo->BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
+    // Don't draw a cursor, but pretend one exists for hover detection
+    mImGuiIo->MouseDrawCursor = false;
+#endif
+
     // Add Font Awesome and merge it into the default font.
     mImGuiIo->Fonts->AddFontDefault();
     // This must match the default font size, which is 13.0f.
@@ -177,6 +185,15 @@ void Gui::ImGuiWMInit() {
             SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
             SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
             ImGui_ImplSDL3_InitForMetal(static_cast<SDL_Window*>(mImpl.Metal.Window));
+#if defined(__IOS__)
+            // Ensure ImGui's main viewport has the correct window ID for touch event processing
+            {
+                ImGuiViewport* mainViewport = ImGui::GetMainViewport();
+                SDL_WindowID windowID = SDL_GetWindowID(static_cast<SDL_Window*>(mImpl.Metal.Window));
+                mainViewport->PlatformHandle = (void*)(uintptr_t)windowID;
+                SPDLOG_INFO("[ImGui Init] Set main viewport PlatformHandle to window ID: {}", windowID);
+            }
+#endif
             break;
 #endif
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
@@ -295,11 +312,55 @@ void Gui::HandleWindowEvents(WindowEvent event) {
     switch (Context::GetInstance()->GetWindow()->GetWindowBackend()) {
         case WindowBackend::FAST3D_SDL_OPENGL:
         case WindowBackend::FAST3D_SDL_METAL:
-            ImGui_ImplSDL3_ProcessEvent(static_cast<const SDL_Event*>(event.Sdl.Event));
-#if defined(__ANDROID__) || defined(__IOS__)
+        {
+#if defined(__IOS__)
+            // iOS-specific diagnostic logging for ImGui event processing
+            const SDL_Event* sdlEvent = static_cast<const SDL_Event*>(event.Sdl.Event);
+            if (sdlEvent->type == SDL_EVENT_MOUSE_MOTION || sdlEvent->type == SDL_EVENT_MOUSE_BUTTON_DOWN || sdlEvent->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                ImGuiViewport* mainViewport = ImGui::GetMainViewport();
+                SPDLOG_INFO("[HandleWindowEvents] Before ProcessEvent - event type={}, windowID={}, viewport PlatformHandle={}, ImGui mouse pos=({}, {}), buttons down={}",
+                    sdlEvent->type,
+                    (sdlEvent->type == SDL_EVENT_MOUSE_MOTION ? sdlEvent->motion.windowID : sdlEvent->button.windowID),
+                    (uintptr_t)mainViewport->PlatformHandle,
+                    mImGuiIo->MousePos.x, mImGuiIo->MousePos.y,
+                    mImGuiIo->MouseDown[0] ? "LEFT" : "NONE");
+            }
+#endif
+            bool eventHandled = ImGui_ImplSDL3_ProcessEvent(static_cast<const SDL_Event*>(event.Sdl.Event));
+#if defined(__IOS__)
+            // CRITICAL FIX: ImGui's AddMousePosEvent/AddMouseButtonEvent queue events but don't update
+            // io.MousePos/io.MouseDown immediately. For touch input, we need immediate updates or clicks
+            // get missed. Manually update the IO state.
+            // Update mouse position on DOWN, UP, and MOTION events
+            // CRITICAL: Must update on BUTTON_UP so TouchFriendlyButton can detect if release was within bounds
+            if (sdlEvent->type == SDL_EVENT_MOUSE_MOTION || sdlEvent->type == SDL_EVENT_MOUSE_BUTTON_DOWN || sdlEvent->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                float mouseX = (sdlEvent->type == SDL_EVENT_MOUSE_MOTION) ? sdlEvent->motion.x : sdlEvent->button.x;
+                float mouseY = (sdlEvent->type == SDL_EVENT_MOUSE_MOTION) ? sdlEvent->motion.y : sdlEvent->button.y;
+                mImGuiIo->MousePos = ImVec2(mouseX, mouseY);
+                SPDLOG_INFO("[HandleWindowEvents] iOS: Manually updated io.MousePos to ({}, {})", mouseX, mouseY);
+            }
+            if (sdlEvent->type == SDL_EVENT_MOUSE_BUTTON_DOWN && sdlEvent->button.button == SDL_BUTTON_LEFT) {
+                mImGuiIo->MouseDown[0] = true;
+                SPDLOG_INFO("[HandleWindowEvents] iOS: Manually set io.MouseDown[0] = true");
+            }
+            if (sdlEvent->type == SDL_EVENT_MOUSE_BUTTON_UP && sdlEvent->button.button == SDL_BUTTON_LEFT) {
+                mImGuiIo->MouseDown[0] = false;
+                SPDLOG_INFO("[HandleWindowEvents] iOS: Manually set io.MouseDown[0] = false");
+            }
+            if (sdlEvent->type == SDL_EVENT_MOUSE_MOTION || sdlEvent->type == SDL_EVENT_MOUSE_BUTTON_DOWN || sdlEvent->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                SPDLOG_INFO("[HandleWindowEvents] After ImGui_ImplSDL3_ProcessEvent - handled={}, ImGui mouse pos=({}, {}), buttons down={}",
+                    eventHandled, mImGuiIo->MousePos.x, mImGuiIo->MousePos.y,
+                    mImGuiIo->MouseDown[0] ? "LEFT" : "NONE");
+            }
+            Mobile::ImGuiProcessEvent(mImGuiIo->WantTextInput);
+#else
+            (void)eventHandled; // Suppress unused variable warning
+#endif
+#if defined(__ANDROID__)
             Mobile::ImGuiProcessEvent(mImGuiIo->WantTextInput);
 #endif
             break;
+        }
 #ifdef ENABLE_DX11
         case WindowBackend::FAST3D_DXGI_DX11:
             ImGui_ImplWin32_WndProcHandler(static_cast<HWND>(event.Win32.Handle), event.Win32.Msg, event.Win32.Param1,

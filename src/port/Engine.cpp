@@ -232,6 +232,21 @@ GameEngine::GameEngine() {
         archiveFiles.push_back(assets_path);
     }
 
+#ifdef __IOS__
+    // On iOS, also check for mods bundled in the app bundle
+    const std::string bundle_mods_path = appDir + "mods";
+    if (std::filesystem::exists(bundle_mods_path) && std::filesystem::is_directory(bundle_mods_path)) {
+        SPDLOG_INFO("[iOS] Looking for bundled mods in: {}", bundle_mods_path);
+        for (const auto& p : std::filesystem::recursive_directory_iterator(bundle_mods_path)) {
+            auto ext = p.path().extension().string();
+            if (StringHelper::IEquals(ext, ".zip") || StringHelper::IEquals(ext, ".o2r")) {
+                SPDLOG_INFO("[iOS] Found bundled mod: {}", p.path().generic_string());
+                archiveFiles.push_back(p.path().generic_string());
+            }
+        }
+    }
+#endif
+
     if (const std::string patches_path = Ship::Context::GetPathRelativeToAppDirectory("mods");
         !patches_path.empty() && std::filesystem::exists(patches_path)) {
         if (std::filesystem::is_directory(patches_path)) {

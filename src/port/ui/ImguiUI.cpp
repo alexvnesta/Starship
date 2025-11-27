@@ -2,6 +2,8 @@
 #include "UIWidgets.h"
 #include "ResolutionEditor.h"
 
+#include <algorithm>
+#include <filesystem>
 #include <spdlog/spdlog.h>
 #include <imgui.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -21,6 +23,275 @@
 
 #ifdef __IOS__
 #include "libultraship/ios/StarshipBridge.h"
+
+// Track touch state for proper button behavior on iOS
+// We need to track where touch-down occurred and only trigger on touch-up within same button
+static ImVec2 g_touchDownPos = ImVec2(-1, -1);
+static bool g_touchConsumed = false;
+static int g_touchFrameCount = -1;
+static bool g_touchDownRecorded = false;  // Track if we recorded a touch-down this frame
+static bool g_needsClearNextFrame = false;  // Clear touch-down pos on NEXT frame after release
+
+// Touch scrolling state
+static ImVec2 g_scrollTouchDownPos = ImVec2(-1, -1);  // Touch-down position for scroll detection
+static bool g_wasTouchingLastFrame = false;  // Track touch state changes manually
+static bool g_isDragging = false;
+static float g_scrollVelocity = 0.0f;
+
+// Touch-friendly button helper for iOS
+// Standard ImGui::Button() relies on hover detection which happens at NewFrame() time,
+// before touch events are processed. With touch input, there's no persistent hover -
+// the touch arrives after hover calculation with the old (FLT_MAX) position.
+// This helper implements proper touch button behavior:
+// - Records touch-down position
+// - Only triggers on touch-up if still within same button bounds
+// - Prevents multiple buttons from reacting to the same touch
+static bool TouchFriendlyButton(const char* label, const ImVec2& size) {
+    ImGuiIO& io = ImGui::GetIO();
+
+    // Reset flags at start of each frame
+    int currentFrame = ImGui::GetFrameCount();
+    if (g_touchFrameCount != currentFrame) {
+        g_touchFrameCount = currentFrame;
+        g_touchConsumed = false;
+        g_touchDownRecorded = false;
+
+        // Clear touch-down tracking if flagged from previous frame
+        // This ensures we don't clear it on the same frame as the release
+        if (g_needsClearNextFrame) {
+            g_touchDownPos = ImVec2(-1, -1);
+            g_needsClearNextFrame = false;
+        }
+    }
+
+    // Draw the button for visual display
+    bool standardResult = ImGui::Button(label, size);
+
+    // Get the button's screen-space bounds
+    ImVec2 buttonMin = ImGui::GetItemRectMin();
+    ImVec2 buttonMax = ImGui::GetItemRectMax();
+
+    // Check if current position is within bounds
+    bool posInBounds = (io.MousePos.x >= buttonMin.x && io.MousePos.x <= buttonMax.x &&
+                        io.MousePos.y >= buttonMin.y && io.MousePos.y <= buttonMax.y);
+
+    // Record touch-down position (only one button should record it)
+    if (io.MouseClicked[0] && posInBounds && !g_touchDownRecorded) {
+        g_touchDownPos = io.MousePos;
+        g_touchDownRecorded = true;
+        SPDLOG_INFO("[TouchFriendlyButton] '{}' touch-down recorded at ({:.0f}, {:.0f})",
+            label, io.MousePos.x, io.MousePos.y);
+    }
+
+    // Check if touch-down was within this button's bounds
+    bool touchDownInBounds = (g_touchDownPos.x >= buttonMin.x && g_touchDownPos.x <= buttonMax.x &&
+                              g_touchDownPos.y >= buttonMin.y && g_touchDownPos.y <= buttonMax.y);
+
+    // Calculate distance between touch-down and touch-up positions
+    // Small movements during a tap are normal on touchscreens
+    float touchDeltaX = io.MousePos.x - g_touchDownPos.x;
+    float touchDeltaY = io.MousePos.y - g_touchDownPos.y;
+    float touchDistance = sqrtf(touchDeltaX * touchDeltaX + touchDeltaY * touchDeltaY);
+
+    // Tap tolerance: if finger moved less than this many pixels, consider it a tap not a scroll
+    const float TAP_TOLERANCE = 50.0f;
+    bool isValidTap = touchDistance < TAP_TOLERANCE;
+
+    // Trigger on touch-up (MouseReleased) if:
+    // 1. Touch-down was within this button
+    // 2. Finger didn't move much (it's a tap, not a scroll)
+    // 3. Touch hasn't been consumed by another button this frame
+    bool touchClicked = io.MouseReleased[0] && touchDownInBounds && isValidTap && !g_touchConsumed;
+
+    if (touchClicked) {
+        SPDLOG_INFO("[TouchFriendlyButton] '{}' ACTIVATED!", label);
+        g_touchConsumed = true;  // Prevent other buttons from triggering
+        g_needsClearNextFrame = true;  // Clear touch-down pos on next frame
+    }
+
+    // If mouse was released but no button was clicked, still need to clear for next touch
+    if (io.MouseReleased[0] && !g_needsClearNextFrame) {
+        g_needsClearNextFrame = true;
+    }
+
+    // Return true if either standard ImGui click detection worked OR our touch detection
+    return standardResult || touchClicked;
+}
+
+// Touch-friendly checkbox for iOS - large toggle button style
+// Returns true if value changed
+static bool TouchFriendlyCheckbox(const char* label, const char* cvar, bool defaultValue = false) {
+    bool currentValue = CVarGetInteger(cvar, defaultValue ? 1 : 0) != 0;
+
+    ImGuiIO& io = ImGui::GetIO();
+    float availWidth = ImGui::GetContentRegionAvail().x;
+    float toggleWidth = 70.0f;
+    float buttonHeight = 44.0f;
+
+    // Draw label on left, toggle on right
+    ImGui::PushID(cvar);
+
+    // Create a button for the entire row for easier touch targeting
+    ImVec2 rowSize(availWidth, buttonHeight);
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+
+    // Style based on current value
+    if (currentValue) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.3f, 1.0f));  // Green when ON
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.6f, 0.4f, 1.0f));
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));  // Gray when OFF
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+    }
+
+    // Format button text: label on left, ON/OFF on right
+    char buttonText[256];
+    snprintf(buttonText, sizeof(buttonText), "%-30s %s", label, currentValue ? "ON" : "OFF");
+
+    bool clicked = TouchFriendlyButton(buttonText, rowSize);
+
+    ImGui::PopStyleColor(2);
+    ImGui::PopID();
+
+    if (clicked) {
+        bool newValue = !currentValue;
+        CVarSetInteger(cvar, newValue ? 1 : 0);
+        Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+        return true;
+    }
+
+    return false;
+}
+
+// Touch-friendly slider for iOS - large touch targets with +/- buttons
+// Returns true if value changed
+static bool TouchFriendlySliderFloat(const char* label, const char* cvar, float minVal, float maxVal, float defaultVal, float step = 0.0f) {
+    float currentValue = CVarGetFloat(cvar, defaultVal);
+    if (step == 0.0f) step = (maxVal - minVal) / 20.0f;  // Default to 5% steps
+
+    float availWidth = ImGui::GetContentRegionAvail().x;
+    float buttonWidth = 50.0f;
+    float buttonHeight = 44.0f;
+
+    ImGui::PushID(cvar);
+
+    // Label
+    ImGui::Text("%s", label);
+
+    // Value display and +/- buttons on same row
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.5f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.6f, 1.0f));
+
+    bool changed = false;
+
+    // Minus button
+    if (TouchFriendlyButton("-", ImVec2(buttonWidth, buttonHeight))) {
+        currentValue = fmaxf(minVal, currentValue - step);
+        changed = true;
+    }
+
+    ImGui::SameLine();
+
+    // Value display (as percentage if 0-1 range, otherwise raw value)
+    float displayWidth = availWidth - buttonWidth * 2 - 20.0f;
+    char valueText[64];
+    if (maxVal <= 1.0f && minVal >= 0.0f) {
+        snprintf(valueText, sizeof(valueText), "%.0f%%", currentValue * 100.0f);
+    } else {
+        snprintf(valueText, sizeof(valueText), "%.1f", currentValue);
+    }
+
+    // Center the value text
+    ImVec2 textSize = ImGui::CalcTextSize(valueText);
+    float textPosX = (displayWidth - textSize.x) / 2.0f;
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + textPosX);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (buttonHeight - textSize.y) / 2.0f);
+    ImGui::Text("%s", valueText);
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(availWidth - buttonWidth);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() - (buttonHeight - textSize.y) / 2.0f);
+
+    // Plus button
+    if (TouchFriendlyButton("+", ImVec2(buttonWidth, buttonHeight))) {
+        currentValue = fminf(maxVal, currentValue + step);
+        changed = true;
+    }
+
+    ImGui::PopStyleColor(2);
+    ImGui::PopID();
+
+    if (changed) {
+        CVarSetFloat(cvar, currentValue);
+        Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    }
+
+    return changed;
+}
+
+// Touch-friendly integer slider
+static bool TouchFriendlySliderInt(const char* label, const char* cvar, int minVal, int maxVal, int defaultVal, int step = 1) {
+    int currentValue = CVarGetInteger(cvar, defaultVal);
+
+    float availWidth = ImGui::GetContentRegionAvail().x;
+    float buttonWidth = 50.0f;
+    float buttonHeight = 44.0f;
+
+    ImGui::PushID(cvar);
+
+    // Label
+    ImGui::Text("%s", label);
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.5f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.6f, 1.0f));
+
+    bool changed = false;
+
+    // Minus button
+    if (TouchFriendlyButton("-", ImVec2(buttonWidth, buttonHeight))) {
+        currentValue = (currentValue - step < minVal) ? minVal : currentValue - step;
+        changed = true;
+    }
+
+    ImGui::SameLine();
+
+    // Value display
+    float displayWidth = availWidth - buttonWidth * 2 - 20.0f;
+    char valueText[64];
+    snprintf(valueText, sizeof(valueText), "%d", currentValue);
+
+    ImVec2 textSize = ImGui::CalcTextSize(valueText);
+    float textPosX = (displayWidth - textSize.x) / 2.0f;
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + textPosX);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (buttonHeight - textSize.y) / 2.0f);
+    ImGui::Text("%s", valueText);
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(availWidth - buttonWidth);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() - (buttonHeight - textSize.y) / 2.0f);
+
+    // Plus button
+    if (TouchFriendlyButton("+", ImVec2(buttonWidth, buttonHeight))) {
+        currentValue = (currentValue + step > maxVal) ? maxVal : currentValue + step;
+        changed = true;
+    }
+
+    ImGui::PopStyleColor(2);
+    ImGui::PopID();
+
+    if (changed) {
+        CVarSetInteger(cvar, currentValue);
+        Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    }
+
+    return changed;
+}
+
+// Section header for organizing options
+static void TouchFriendlySectionHeader(const char* title) {
+    ImGui::Spacing();
+    ImGui::TextColored(ImVec4(0.7f, 0.8f, 1.0f, 1.0f), "%s", title);
+    ImGui::Separator();
+    ImGui::Spacing();
+}
 #endif
 
 extern "C" {
@@ -944,7 +1215,8 @@ void DrawDebugMenu() {
 
 void GameMenuBar::DrawElement() {
 #ifdef __IOS__
-    // On iOS, use a touch-friendly window instead of menu bar
+    // On iOS, use a touch-friendly window with tree nodes instead of menu bar
+    // Menu bars are designed for desktop and don't work well with touch
     // Note: iOS_SetMenuOpen is called from GuiMenuBar::SetVisibility()
     // This method is only called when IsVisible() is true (see GuiMenuBar::Draw)
 
@@ -959,42 +1231,361 @@ void GameMenuBar::DrawElement() {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
 
-    // Use a regular window with scroll support - works better with touch than popups
+    // Use a regular window with scroll support - works better with touch than menu bars
     ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar;
 
+    // Ensure window receives input focus for touch interaction
+    ImGui::SetNextWindowFocus();
+
     bool windowOpen = true;
     if (ImGui::Begin("iOS Settings Menu", &windowOpen, windowFlags)) {
-        // Large close button at top for easy touch - centered with padding
-        ImGui::Spacing();
-        ImGui::Indent(20.0f);
-        float buttonWidth = ImGui::GetContentRegionAvail().x - 40.0f;
-        if (ImGui::Button("Close Menu", ImVec2(buttonWidth, 50))) {
+        // CRITICAL: Force this window to be the focused window for input
+        ImGui::SetWindowFocus();
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+
+        // Track touch-down position for scroll gesture detection (independent of buttons)
+        // Use manual state tracking instead of io.MouseClicked which may not be reliable
+        bool isTouchingNow = io.MouseDown[0];
+        bool touchJustStarted = isTouchingNow && !g_wasTouchingLastFrame;
+        bool touchJustEnded = !isTouchingNow && g_wasTouchingLastFrame;
+
+        if (touchJustStarted) {
+            // Touch just started - record position for scroll detection
+            g_scrollTouchDownPos = io.MousePos;
+            SPDLOG_INFO("[iOS Scroll] Touch-down detected at ({:.0f}, {:.0f})", io.MousePos.x, io.MousePos.y);
+        }
+        if (touchJustEnded) {
+            SPDLOG_INFO("[iOS Scroll] Touch-up detected at ({:.0f}, {:.0f}), down was ({:.0f}, {:.0f})",
+                io.MousePos.x, io.MousePos.y, g_scrollTouchDownPos.x, g_scrollTouchDownPos.y);
+        }
+        g_wasTouchingLastFrame = isTouchingNow;
+
+        // ========== VERTICAL SIDEBAR NAVIGATION ==========
+        // Vertical tabs on left, content on right - optimal for landscape mode
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 8.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
+
+        float windowWidth = ImGui::GetContentRegionAvail().x;
+        float windowHeight = ImGui::GetContentRegionAvail().y;
+
+        // Sidebar dimensions
+        float sidebarWidth = 110.0f;
+        float contentWidth = windowWidth - sidebarWidth - 10.0f;  // Gap between sidebar and content
+        float tabHeight = 45.0f;
+
+        const char* tabNames[] = { "Game", "Settings", "Graphics", "Cheats", "Dev", "Mods" };
+        const int numTabs = 6;
+
+        // Left sidebar with vertical tabs
+        ImGui::BeginChild("Sidebar", ImVec2(sidebarWidth, windowHeight), false, ImGuiWindowFlags_NoScrollbar);
+
+        for (int i = 0; i < numTabs; i++) {
+            // Highlight selected tab
+            bool isSelected = (mOpenSection == i);
+            if (isSelected) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.5f, 0.8f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.6f, 0.9f, 1.0f));
+            } else {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.35f, 0.35f, 1.0f));
+            }
+
+            if (TouchFriendlyButton(tabNames[i], ImVec2(sidebarWidth - 8.0f, tabHeight))) {
+                mOpenSection = i;
+            }
+
+            ImGui::PopStyleColor(2);
+        }
+
+        // Spacer to push close button to bottom
+        float remainingHeight = windowHeight - (numTabs * (tabHeight + 4.0f)) - tabHeight - 8.0f;
+        if (remainingHeight > 0) {
+            ImGui::Dummy(ImVec2(0, remainingHeight));
+        }
+
+        // Close button at bottom of sidebar - styled red
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
+        if (TouchFriendlyButton("X Close", ImVec2(sidebarWidth - 8.0f, tabHeight))) {
             ToggleVisibility();
         }
-        ImGui::Unindent(20.0f);
+        ImGui::PopStyleColor(2);
 
-        ImGui::Spacing();
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        ImGui::Spacing();
+        ImGui::EndChild();
 
-        // Draw all menu sections with proper spacing
-        DrawGameMenu();
-        ImGui::Spacing();
-        ImGui::Spacing();
-        DrawSettingsMenu();
-        ImGui::Spacing();
-        ImGui::Spacing();
-        DrawEnhancementsMenu();
-        ImGui::Spacing();
-        ImGui::Spacing();
-        DrawCheatsMenu();
-        ImGui::Spacing();
-        ImGui::Spacing();
-        DrawDebugMenu();
-        ImGui::Spacing();
+        // Content area on the right
+        ImGui::SameLine(0, 10.0f);
+        ImGui::BeginChild("TabContent", ImVec2(contentWidth, windowHeight), false, ImGuiWindowFlags_None);
+
+        float buttonWidth = ImGui::GetContentRegionAvail().x;
+        ImVec2 buttonSize(buttonWidth, 50.0f);
+
+        // Draw content based on selected tab
+        switch (mOpenSection) {
+            case 0:  // Game tab
+                TouchFriendlySectionHeader("Game");
+
+                if (TouchFriendlyButton("Reset Game", buttonSize)) {
+                    gNextGameState = GSTATE_BOOT;
+                    ToggleVisibility();  // Close menu after reset
+                }
+                ImGui::Spacing();
+
+                if (TouchFriendlyButton("Quit Game", buttonSize)) {
+                    Ship::Context::GetInstance()->GetWindow()->Close();
+                }
+
+                TouchFriendlySectionHeader("Gameplay");
+
+                TouchFriendlyCheckbox("Invert Y Axis", "gInvertYAxis");
+                break;
+
+            case 1:  // Settings tab
+                TouchFriendlySectionHeader("Audio");
+
+                TouchFriendlySliderFloat("Master Volume", "gGameMasterVolume", 0.0f, 1.0f, 1.0f, 0.05f);
+                TouchFriendlySliderFloat("Music Volume", "gMainMusicVolume", 0.0f, 1.0f, 1.0f, 0.05f);
+                TouchFriendlySliderFloat("Voice Volume", "gVoiceVolume", 0.0f, 1.0f, 1.0f, 0.05f);
+                TouchFriendlySliderFloat("SFX Volume", "gSFXMusicVolume", 0.0f, 1.0f, 1.0f, 0.05f);
+
+                TouchFriendlySectionHeader("Touch Controls");
+
+                TouchFriendlyCheckbox("Show Touch Controls", "gShowTouchControls", true);
+
+                TouchFriendlySectionHeader("Gyro Controls");
+
+                TouchFriendlyCheckbox("Enable Gyro Aiming", "gGyroEnabled", true);
+                TouchFriendlySliderFloat("Gyro Sensitivity", "gGyroSensitivity", 5.0f, 40.0f, 20.0f, 2.5f);
+                TouchFriendlySliderFloat("Gyro Deadzone", "gGyroDeadzone", 0.0f, 5.0f, 0.5f, 0.25f);
+                TouchFriendlyCheckbox("Invert Gyro Pitch", "gGyroInvertPitch", true);
+                TouchFriendlyCheckbox("Invert Gyro Roll", "gGyroInvertRoll", true);
+                break;
+
+            case 2:  // Graphics tab
+                TouchFriendlySectionHeader("Performance");
+
+                // FPS Target (30-120 for mobile, higher values waste battery)
+                if (TouchFriendlySliderInt("FPS Target", "gInterpolationFPS", 30, 120, 60, 10)) {
+                    // FPS changed - no additional action needed, engine reads this
+                }
+                TouchFriendlyCheckbox("Match Refresh Rate", "gMatchRefreshRate");
+
+                // MSAA Anti-aliasing
+                if (TouchFriendlySliderInt("Anti-Aliasing (MSAA)", "gMSAAValue", 1, 4, 1, 1)) {
+                    Ship::Context::GetInstance()->GetWindow()->SetMsaaLevel(CVarGetInteger("gMSAAValue", 1));
+                }
+
+                TouchFriendlySectionHeader("Enhancements");
+
+                TouchFriendlyCheckbox("No LOD (Better models)", "gDisableLOD", true);
+                TouchFriendlyCheckbox("Show faces in Arwings", "gTeamFaces", true);
+                TouchFriendlyCheckbox("Red radio for enemies", "gEnemyRedRadio");
+                TouchFriendlySliderInt("Cockpit Opacity", "gCockpitOpacity", 0, 255, 120, 15);
+                TouchFriendlyCheckbox("Alternative Assets", "gEnhancements.Mods.AlternateAssets");
+
+                TouchFriendlySectionHeader("Fixes");
+
+                TouchFriendlyCheckbox("Macbeth camera fix", "gMaCameraFix");
+                TouchFriendlyCheckbox("Sector Z actor fix", "gSzActorFix");
+
+                TouchFriendlySectionHeader("Restoration");
+
+                TouchFriendlyCheckbox("Restore beta coin", "gRestoreBetaCoin");
+                TouchFriendlyCheckbox("Restore beta boost gauge", "gRestoreBetaBoostGauge");
+                TouchFriendlyCheckbox("Sector Z missile bug", "gSzMissileBug");
+
+                TouchFriendlySectionHeader("Accessibility");
+
+                TouchFriendlyCheckbox("Disable Gorgon flash", "gDisableGorgonFlash");
+                TouchFriendlyCheckbox("Radar ship outlines", "gFighterOutlines");
+                break;
+
+            case 3:  // Cheats tab
+                TouchFriendlySectionHeader("Player Cheats");
+
+                TouchFriendlyCheckbox("Infinite Lives", "gInfiniteLives");
+                TouchFriendlyCheckbox("Invincible", "gInvincible");
+                TouchFriendlyCheckbox("Unbreakable Wings", "gUnbreakableWings");
+                TouchFriendlyCheckbox("Infinite Bombs", "gInfiniteBombs");
+                TouchFriendlyCheckbox("Infinite Boost/Brake", "gInfiniteBoost");
+
+                TouchFriendlySectionHeader("Weapon Cheats");
+
+                TouchFriendlyCheckbox("Hyper Laser", "gHyperLaser");
+                TouchFriendlyCheckbox("Rapid-fire mode", "gRapidFire");
+                if (CVarGetInteger("gRapidFire", 0) == 1) {
+                    TouchFriendlyCheckbox("  Hold L to Charge", "gLtoCharge");
+                }
+                TouchFriendlySliderInt("Laser Range %", "gLaserRangeMult", 15, 800, 100, 25);
+
+                TouchFriendlySectionHeader("Team");
+
+                TouchFriendlyCheckbox("Start with Falco dead", "gHit64FalcoDead");
+                TouchFriendlyCheckbox("Start with Slippy dead", "gHit64SlippyDead");
+                TouchFriendlyCheckbox("Start with Peppy dead", "gHit64PeppyDead");
+
+                TouchFriendlySectionHeader("Misc");
+
+                TouchFriendlyCheckbox("Self destruct (D-Pad Down)", "gHit64SelfDestruct");
+                break;
+
+            case 4:  // Dev tab
+                TouchFriendlySectionHeader("Display");
+
+                // Stats window toggle
+                {
+                    bool statsEnabled = CVarGetInteger("gStatsEnabled", 0) != 0;
+                    if (TouchFriendlyCheckbox("Show FPS/Stats", "gStatsEnabled")) {
+                        // Toggle the stats window visibility
+                        if (GameUI::mStatsWindow) {
+                            if (CVarGetInteger("gStatsEnabled", 0)) {
+                                GameUI::mStatsWindow->Show();
+                            } else {
+                                GameUI::mStatsWindow->Hide();
+                            }
+                        }
+                    }
+                }
+                TouchFriendlyCheckbox("Show Gyro Debug", "gShowGyroDebug");
+
+                TouchFriendlySectionHeader("Developer");
+
+                TouchFriendlyCheckbox("Level Selector", "gLevelSelector");
+                TouchFriendlyCheckbox("Skip Briefing", "gSkipBriefing");
+                TouchFriendlyCheckbox("Force Expert Mode", "gForceExpertMode");
+                TouchFriendlyCheckbox("SFX Jukebox", "gSfxJukebox");
+
+                TouchFriendlySectionHeader("Debug Modes");
+
+                TouchFriendlyCheckbox("Speed Control (D-Pad)", "gDebugSpeedControl");
+                TouchFriendlyCheckbox("No Collision", "gDebugNoCollision");
+                TouchFriendlyCheckbox("Debug Pause (L)", "gLToDebugPause");
+                if (CVarGetInteger("gLToDebugPause", 0)) {
+                    TouchFriendlyCheckbox("  Frame Advance", "gLToFrameAdvance");
+                }
+
+                TouchFriendlySectionHeader("Shortcuts");
+
+                TouchFriendlyCheckbox("L to Warp Zone", "gDebugWarpZone");
+                TouchFriendlyCheckbox("L to All-Range", "gDebugJumpToAllRange");
+                TouchFriendlyCheckbox("L to Level Complete", "gDebugLevelComplete");
+                TouchFriendlyCheckbox("Jump To Map (Z+R+C-Up)", "gDebugJumpToMap");
+
+                TouchFriendlySectionHeader("Tools");
+
+                TouchFriendlyCheckbox("Spawner Mod", "gSpawnerMod");
+                TouchFriendlyCheckbox("Disable Star Interpolation", "gDisableStarsInterpolation");
+                break;
+
+            case 5:  // Mods tab
+                TouchFriendlySectionHeader("Installed Mods");
+                {
+                    // List O2R/ZIP files in mods directory
+                    std::string modsPath = Ship::Context::GetPathRelativeToAppDirectory("mods");
+
+                    if (std::filesystem::exists(modsPath) && std::filesystem::is_directory(modsPath)) {
+                        int modCount = 0;
+                        for (const auto& entry : std::filesystem::directory_iterator(modsPath)) {
+                            if (entry.is_regular_file()) {
+                                std::string ext = entry.path().extension().string();
+                                // Convert to lowercase for comparison
+                                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+                                if (ext == ".o2r" || ext == ".zip") {
+                                    std::string modName = entry.path().filename().string();
+                                    modCount++;
+
+                                    // Display mod with file size
+                                    auto fileSize = std::filesystem::file_size(entry.path());
+                                    std::string sizeStr;
+                                    if (fileSize < 1024) {
+                                        sizeStr = std::to_string(fileSize) + " B";
+                                    } else if (fileSize < 1024 * 1024) {
+                                        sizeStr = std::to_string(fileSize / 1024) + " KB";
+                                    } else {
+                                        sizeStr = std::to_string(fileSize / (1024 * 1024)) + " MB";
+                                    }
+
+                                    // Display as a button row (read-only for now)
+                                    char displayText[256];
+                                    snprintf(displayText, sizeof(displayText), "%-25s %s", modName.c_str(), sizeStr.c_str());
+
+                                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.35f, 0.25f, 1.0f));
+                                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.4f, 0.3f, 1.0f));
+                                    TouchFriendlyButton(displayText, ImVec2(contentWidth - 20.0f, 50.0f));
+                                    ImGui::PopStyleColor(2);
+                                }
+                            }
+                        }
+
+                        if (modCount == 0) {
+                            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "No mods found");
+                        }
+                    } else {
+                        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Mods folder not found");
+                    }
+                }
+
+                TouchFriendlySectionHeader("Add Mods");
+                ImGui::TextWrapped("Place .o2r or .zip mod files in:");
+                ImGui::Spacing();
+                ImGui::TextColored(ImVec4(0.7f, 0.8f, 1.0f, 1.0f), "Documents/mods/");
+                ImGui::Spacing();
+                ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Restart required after adding mods");
+                break;
+
+            default:
+                mOpenSection = 0;  // Default to Game tab
+                break;
+        }
+
+        // Touch-based scrolling for iOS - MUST be inside child region to affect its scroll
+        // NOTE: SDL on iOS doesn't generate MOTION events during touch drag, only DOWN and UP.
+        // So we calculate scroll delta at touch-up time based on the full gesture distance.
+        float currentScrollY = ImGui::GetScrollY();
+        float maxScrollY = ImGui::GetScrollMaxY();
+
+        // Detect scroll gesture on touch release
+        // A scroll gesture is when the finger moved more than TAP_TOLERANCE (50px)
+        // Uses touchJustEnded computed at start of frame
+        if (touchJustEnded && g_scrollTouchDownPos.x >= 0 && maxScrollY > 0) {
+            float deltaY = g_scrollTouchDownPos.y - io.MousePos.y;  // Positive = finger moved up = scroll down
+            float touchDistance = fabsf(deltaY);
+
+            const float TAP_TOLERANCE = 50.0f;
+            if (touchDistance >= TAP_TOLERANCE) {
+                // This was a scroll gesture, not a tap
+                // Apply the scroll delta (inverted: drag down = scroll up to show earlier content)
+                float newScroll = currentScrollY + deltaY;
+                newScroll = ImClamp(newScroll, 0.0f, maxScrollY);
+                ImGui::SetScrollY(newScroll);
+                g_scrollVelocity = deltaY * 0.3f;  // Initial momentum
+                g_isDragging = true;
+                SPDLOG_INFO("[iOS Scroll] Scroll gesture: deltaY={:.0f}, newScroll={:.0f}, maxScroll={:.0f}",
+                    deltaY, newScroll, maxScrollY);
+            }
+        }
+
+        // Apply momentum scrolling after gesture ends
+        if (!io.MouseDown[0] && g_isDragging && fabsf(g_scrollVelocity) > 0.5f && maxScrollY > 0) {
+            float newScroll = currentScrollY + g_scrollVelocity;
+            newScroll = ImClamp(newScroll, 0.0f, maxScrollY);
+            ImGui::SetScrollY(newScroll);
+            g_scrollVelocity *= 0.92f;
+        } else if (!io.MouseDown[0]) {
+            g_scrollVelocity = 0.0f;
+            g_isDragging = false;
+        }
+
+        ImGui::EndChild();  // End TabContent - scroll applies to this child
+
+        // Reset scroll touch tracking on release (outside child since it's global state)
+        if (touchJustEnded) {
+            g_scrollTouchDownPos = ImVec2(-1, -1);
+        }
+
+        ImGui::PopStyleVar(2);
     }
     ImGui::End();
 

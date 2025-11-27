@@ -558,13 +558,15 @@ void GfxRenderingAPIMetal::EndFrame() {
     if (!mCurrentDrawable) {
         SPDLOG_ERROR("[Metal] EndFrame: No current drawable to present!");
     } else {
-        SPDLOG_INFO("[Metal] EndFrame: Presenting drawable");
+        // Verbose per-frame logging suppressed - uncomment for debugging
+        // SPDLOG_INFO("[Metal] EndFrame: Presenting drawable");
         screen_framebuffer.mCommandBuffer->presentDrawable(mCurrentDrawable);
     }
 
     mCurrentVertexBufferPoolIndex = (mCurrentVertexBufferPoolIndex + 1) % kMaxVertexBufferPoolSize;
     screen_framebuffer.mCommandBuffer->commit();
-    SPDLOG_INFO("[Metal] EndFrame: Command buffer committed");
+    // Verbose per-frame logging suppressed - uncomment for debugging
+    // SPDLOG_INFO("[Metal] EndFrame: Command buffer committed");
 
     mDrawnFramebuffers.clear();
 
@@ -624,7 +626,8 @@ void GfxRenderingAPIMetal::SetupScreenFramebuffer(uint32_t width, uint32_t heigh
         return;
     }
 
-    SPDLOG_INFO("[Metal] Got drawable, size: {}x{}", width, height);
+    // Verbose per-frame logging suppressed - uncomment for debugging
+    // SPDLOG_INFO("[Metal] Got drawable, size: {}x{}", width, height);
 
     bool msaa_enabled = CVarGetInteger("gMSAAValue", 1) > 1;
 

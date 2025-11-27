@@ -564,9 +564,21 @@ void GfxWindowBackendSDL3::OnMouseButtonUp(int btn) const {
 }
 
 void GfxWindowBackendSDL3::HandleSingleEvent(SDL_Event& event) {
+#if defined(__IOS__)
+    if (event.type == SDL_EVENT_MOUSE_MOTION || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        SPDLOG_INFO("[HandleSingleEvent] Processing event type={}, mouse pos=({}, {})", event.type,
+            event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.x : event.button.x,
+            event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.y : event.button.y);
+    }
+#endif
     Ship::WindowEvent event_impl;
     event_impl.Sdl = { &event };
     Ship::Context::GetInstance()->GetWindow()->GetGui()->HandleWindowEvents(event_impl);
+#if defined(__IOS__)
+    if (event.type == SDL_EVENT_MOUSE_MOTION || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        SPDLOG_INFO("[HandleSingleEvent] After HandleWindowEvents for event type={}", event.type);
+    }
+#endif
     switch (event.type) {
 #ifndef TARGET_WEB
         // Scancodes are broken in Emscripten SDL2: https://bugzilla.libsdl.org/show_bug.cgi?id=3259
@@ -616,6 +628,13 @@ void GfxWindowBackendSDL3::HandleEvents() {
     // SDL3 renamed event constants: SDL_FIRSTEVENT -> SDL_EVENT_FIRST, SDL_LASTEVENT -> SDL_EVENT_LAST
     // SDL_CONTROLLERDEVICEADDED -> SDL_EVENT_GAMEPAD_ADDED, SDL_CONTROLLERDEVICEREMOVED -> SDL_EVENT_GAMEPAD_REMOVED
     while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_EVENT_FIRST, SDL_EVENT_GAMEPAD_ADDED - 1) > 0) {
+#if defined(__IOS__)
+        if (event.type == SDL_EVENT_MOUSE_MOTION || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+            SPDLOG_INFO("[SDL Event] Polled event type={}, mouse pos=({}, {})", event.type,
+                event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.x : event.button.x,
+                event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.y : event.button.y);
+        }
+#endif
         HandleSingleEvent(event);
     }
     while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_EVENT_GAMEPAD_REMOVED + 1, SDL_EVENT_LAST) > 0) {

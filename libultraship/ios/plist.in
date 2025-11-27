@@ -114,6 +114,10 @@
 	<key>GCSupportsControllerUserInteraction</key>
 	<true/>
 
+	<!-- Disable automatic touch-to-mouse conversion - we handle it manually via SDL -->
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<false/>
+
 	<!-- App Transport Security - Allow local network access for debugging -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

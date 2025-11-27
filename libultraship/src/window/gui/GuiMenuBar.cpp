@@ -9,13 +9,15 @@ namespace Ship {
 GuiMenuBar::GuiMenuBar(const std::string& visibilityConsoleVariable, bool isVisible)
     : GuiElement(isVisible), mVisibilityConsoleVariable(visibilityConsoleVariable) {
     if (!mVisibilityConsoleVariable.empty()) {
-        mIsVisible = CVarGetInteger(mVisibilityConsoleVariable.c_str(), mIsVisible);
-        SyncVisibilityConsoleVariable();
 #if defined(__IOS__)
-        // Sync iOS touch controls state with menu visibility on startup
-        SPDLOG_INFO("[GuiMenuBar] Constructor calling iOS_SetMenuOpen with mIsVisible={}", mIsVisible);
-        iOS_SetMenuOpen(mIsVisible);
+        // On iOS, always start with menu closed (ignore saved CVar) to prevent startup in stuck state
+        // The touch controls are initialized first, and menu visibility is controlled via SetVisibility()
+        SPDLOG_INFO("[GuiMenuBar] Constructor - iOS mode, forcing mIsVisible=false at startup");
+        mIsVisible = false;
+#else
+        mIsVisible = CVarGetInteger(mVisibilityConsoleVariable.c_str(), mIsVisible);
 #endif
+        SyncVisibilityConsoleVariable();
     }
 }
 

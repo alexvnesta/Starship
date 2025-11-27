@@ -358,7 +358,8 @@ extern "C" void iOS_SetButton(int button, bool value) {
         return;
     }
 
-    SDL_Log("[iOS] iOS_SetButton: button=%d, value=%d, joystick=%p", button, value, virtual_joystick);
+    // Verbose button logging suppressed - uncomment for debugging
+    // SDL_Log("[iOS] iOS_SetButton: button=%d, value=%d, joystick=%p", button, value, virtual_joystick);
 
     if (button < 0) {
         // Negative button values are treated as axis inputs
@@ -377,15 +378,17 @@ extern "C" void iOS_SetButton(int button, bool value) {
         // This cache provides direct, reliable access to button states bypassing SDL's broken queries
         if (button >= 0 && button < MAX_BUTTONS) {
             g_button_state_cache[button] = value;
-            SDL_Log("[iOS] ✅ Button state cache updated: button=%d, value=%d", button, value);
+            // Verbose cache logging suppressed - uncomment for debugging
+            // SDL_Log("[iOS] ✅ Button state cache updated: button=%d, value=%d", button, value);
         } else {
             SDL_Log("[iOS] ❌ WARNING: Button index %d out of range [0-%d]", button, MAX_BUTTONS - 1);
         }
 
         // Still call SDL APIs for compatibility but don't rely on them for state queries
         bool result = SDL_SetJoystickVirtualButton(virtual_joystick, button, value);
-        SDL_Log("[iOS] SDL_SetJoystickVirtualButton(button=%d, value=%d) returned: %s",
-                button, value, result ? "SUCCESS" : "FAILURE");
+        // Verbose SDL logging suppressed - uncomment for debugging
+        // SDL_Log("[iOS] SDL_SetJoystickVirtualButton(button=%d, value=%d) returned: %s",
+        //         button, value, result ? "SUCCESS" : "FAILURE");
 
         if (!result) {
             SDL_Log("[iOS] ❌ SDL_SetJoystickVirtualButton FAILED!");
@@ -427,7 +430,7 @@ extern "C" void iOS_SetAxis(int axis, short value) {
 
         // Only log when axis value changes significantly (avoid spam)
         static short lastValues[MAX_AXES] = {0};
-        if (abs(value - lastValues[axis]) > 1000) {
+        if (abs(value - lastValues[axis]) > 10000) {
             SDL_Log("[iOS] ✅ Axis state cache updated: axis=%d, value=%d", axis, value);
             lastValues[axis] = value;
         }

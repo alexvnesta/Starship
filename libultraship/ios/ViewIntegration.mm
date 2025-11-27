@@ -3,8 +3,7 @@
 //  Starship iOS
 //
 //  Integration between SDL's rendering view and iOS touch controls
-//  NEW APPROACH: Add touch controls as a subview of SDL's view hierarchy
-//  This eliminates window management issues - all touches go to the same window
+//  This ensures touch controls appear on top of the game rendering
 //
 
 #import <UIKit/UIKit.h>
@@ -16,15 +15,8 @@
 // Global reference to the view controller
 static StarshipViewController* g_viewController = nil;
 
-// Global reference to SDL's UIWindow
+// Global reference to the SDL UIWindow for menu focus switching
 static UIWindow* g_sdlWindow = nil;
-
-// Global reference to touch controls container view
-static UIView* g_touchControlsView = nil;
-
-// Pending menu state to apply when touch controls are created
-static bool g_pendingMenuOpenState = false;
-static bool g_hasPendingMenuState = false;
 
 void iOS_IntegrateSDLView(void* sdlWindow) {
     if (!sdlWindow) {
@@ -32,7 +24,7 @@ void iOS_IntegrateSDLView(void* sdlWindow) {
         return;
     }
 
-    NSLog(@"[iOS View Integration] Starting integration (single window approach)...");
+    NSLog(@"[iOS View Integration] Starting integration...");
 
     SDL_Window* window = (SDL_Window*)sdlWindow;
 
@@ -44,9 +36,8 @@ void iOS_IntegrateSDLView(void* sdlWindow) {
     }
 
     NSLog(@"[iOS View Integration] Got UIWindow: %@", uiWindow);
-    g_sdlWindow = uiWindow;
 
-    // Create the StarshipViewController if needed
+    // Create or get the StarshipViewController
     if (!g_viewController) {
         g_viewController = [[StarshipViewController alloc] init];
         NSLog(@"[iOS View Integration] Created StarshipViewController");
@@ -67,135 +58,168 @@ void iOS_IntegrateSDLView(void* sdlWindow) {
 
     NSLog(@"[iOS View Integration] Got SDL view: %@", sdlView);
     NSLog(@"[iOS View Integration] SDL view frame: %@", NSStringFromCGRect(sdlView.frame));
+    NSLog(@"[iOS View Integration] SDL view bounds: %@", NSStringFromCGRect(sdlView.bounds));
+    NSLog(@"[iOS View Integration] SDL view controller: %@", sdlViewController);
+    NSLog(@"[iOS View Integration] SDL view layer: %@", sdlView.layer);
+    NSLog(@"[iOS View Integration] SDL view layer class: %@", NSStringFromClass([sdlView.layer class]));
+    NSLog(@"[iOS View Integration] SDL view backgroundColor: %@", sdlView.backgroundColor);
+    NSLog(@"[iOS View Integration] SDL view opaque: %d", sdlView.opaque);
+    NSLog(@"[iOS View Integration] SDL view hidden: %d", sdlView.hidden);
+    NSLog(@"[iOS View Integration] SDL view alpha: %.2f", sdlView.alpha);
+    NSLog(@"[iOS View Integration] SDL view superview: %@", sdlView.superview);
+    NSLog(@"[iOS View Integration] SDL window: %@", uiWindow);
+    NSLog(@"[iOS View Integration] SDL window hidden: %d", uiWindow.hidden);
+    NSLog(@"[iOS View Integration] SDL window alpha: %.2f", uiWindow.alpha);
+    NSLog(@"[iOS View Integration] SDL window isKeyWindow: %d", uiWindow.isKeyWindow);
 
     // CRITICAL: Set the SceneDelegate's window property for iOS 13+ scene-based lifecycle
+    // The SceneDelegate MUST own the window for it to become key and visible
+    NSLog(@"[iOS View Integration] Checking window scene...");
+    NSLog(@"[iOS View Integration] uiWindow.windowScene: %@", uiWindow.windowScene);
+
     if (uiWindow.windowScene) {
         UIWindowScene *windowScene = uiWindow.windowScene;
+        NSLog(@"[iOS View Integration] windowScene.delegate: %@", windowScene.delegate);
+        NSLog(@"[iOS View Integration] windowScene.delegate class: %@", NSStringFromClass([windowScene.delegate class]));
+
         if (windowScene.delegate && [windowScene.delegate isKindOfClass:[StarshipSceneDelegate class]]) {
             StarshipSceneDelegate *sceneDelegate = (StarshipSceneDelegate *)windowScene.delegate;
             sceneDelegate.window = uiWindow;
-            NSLog(@"[iOS View Integration] ✅ Set SceneDelegate.window property");
+            NSLog(@"[iOS View Integration] ✅ Set SceneDelegate.window property - window will now become key");
+        } else {
+            NSLog(@"[iOS View Integration] ❌ Warning: SceneDelegate is not StarshipSceneDelegate class");
         }
     } else {
-        // Try to find and associate with active window scene
+        NSLog(@"[iOS View Integration] ❌ ERROR: uiWindow.windowScene is NIL - SDL window not associated with scene!");
+        NSLog(@"[iOS View Integration] This is the root cause - need to associate window with scene manually");
+
+        // Try to find the active window scene and associate the window with it
         NSSet<UIScene *> *connectedScenes = [UIApplication sharedApplication].connectedScenes;
+        NSLog(@"[iOS View Integration] Connected scenes: %@", connectedScenes);
+
         for (UIScene *scene in connectedScenes) {
             if ([scene isKindOfClass:[UIWindowScene class]]) {
                 UIWindowScene *windowScene = (UIWindowScene *)scene;
+                NSLog(@"[iOS View Integration] Found UIWindowScene: %@", windowScene);
+
+                // Associate the window with this scene
                 uiWindow.windowScene = windowScene;
+                NSLog(@"[iOS View Integration] Associated SDL window with scene");
+
+                // Now try to set the delegate's window property
                 if (windowScene.delegate && [windowScene.delegate isKindOfClass:[StarshipSceneDelegate class]]) {
                     StarshipSceneDelegate *sceneDelegate = (StarshipSceneDelegate *)windowScene.delegate;
                     sceneDelegate.window = uiWindow;
-                    NSLog(@"[iOS View Integration] ✅ Set SceneDelegate.window after manual association");
+                    NSLog(@"[iOS View Integration] ✅ Set SceneDelegate.window property after manual scene association");
                 }
                 break;
             }
         }
     }
 
+    // Store reference to SDL window for menu focus switching
+    g_sdlWindow = uiWindow;
+
     // Make sure the window is visible and key
     uiWindow.hidden = NO;
     uiWindow.alpha = 1.0;
     [uiWindow makeKeyAndVisible];
 
-    NSLog(@"[iOS View Integration] Made SDL window key and visible");
+    // Force the Metal layer to display
+    CAMetalLayer* metalLayer = (CAMetalLayer*)sdlView.layer;
+    [metalLayer setNeedsDisplay];
+    [metalLayer displayIfNeeded];
 
-    // Load the view controller's view to trigger viewDidLoad and setupTouchControls
-    [g_viewController loadViewIfNeeded];
+    // Force the view and window to update
+    [sdlView setNeedsDisplay];
+    [sdlView setNeedsLayout];
+    [sdlView layoutIfNeeded];
+    [uiWindow setNeedsDisplay];
+    [uiWindow setNeedsLayout];
+    [uiWindow layoutIfNeeded];
 
-    // Get the touch controls container from our view controller
-    UIView* touchControls = g_viewController.touchControlsContainer;
-    if (touchControls) {
-        // Remove from current parent if any
-        [touchControls removeFromSuperview];
+    NSLog(@"[iOS View Integration] Made window key and visible");
+    NSLog(@"[iOS View Integration] Forced display updates on view and layer");
 
-        // Add touch controls as a subview of SDL's view (on top)
-        touchControls.frame = sdlView.bounds;
-        touchControls.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        touchControls.backgroundColor = [UIColor clearColor];
-        touchControls.opaque = NO;
-        touchControls.userInteractionEnabled = YES;
+    // Create overlay window for touch controls
+    // This window sits on top of the SDL window to display touch controls
+    UIWindowScene *windowScene = uiWindow.windowScene;
+    if (windowScene) {
+        // Load the view controller's view to trigger viewDidLoad and setupTouchControls
+        [g_viewController loadViewIfNeeded];
 
-        NSLog(@"[iOS View Integration] 🔧 Touch controls initial state: hidden=%d, userInteraction=%d",
-              touchControls.hidden, touchControls.userInteractionEnabled);
+        // Create a new UIWindow for the touch controls overlay
+        UIWindow *overlayWindow = [[UIWindow alloc] initWithWindowScene:windowScene];
+        overlayWindow.rootViewController = g_viewController;
+        overlayWindow.windowLevel = UIWindowLevelNormal + 1;  // Above SDL window
+        overlayWindow.backgroundColor = [UIColor clearColor];  // Transparent background
+        overlayWindow.opaque = NO;
+        overlayWindow.userInteractionEnabled = YES;
 
-        [sdlView addSubview:touchControls];
-        [sdlView bringSubviewToFront:touchControls];
+        // Make overlay window visible AND key so it can receive touch events
+        // Metal rendering works fine even if SDL window is not key
+        [overlayWindow makeKeyAndVisible];
 
-        g_touchControlsView = touchControls;
+        // Store reference in view controller
+        g_viewController.overlayWindow = overlayWindow;
 
-        NSLog(@"[iOS View Integration] ✅ Added touch controls as subview of SDL view");
-        NSLog(@"[iOS View Integration] Touch controls frame: %@", NSStringFromCGRect(touchControls.frame));
-        NSLog(@"[iOS View Integration] SDL view subviews: %@", sdlView.subviews);
-
-        // Apply any pending menu state that was set before touch controls were created
-        NSLog(@"[iOS View Integration] 🔍 Checking pending state: g_hasPendingMenuState=%d, g_pendingMenuOpenState=%d",
-              g_hasPendingMenuState, g_pendingMenuOpenState);
-
-        if (g_hasPendingMenuState) {
-            NSLog(@"[iOS View Integration] 🟡 Applying pending menu state: menuOpen=%d", g_pendingMenuOpenState);
-            touchControls.hidden = g_pendingMenuOpenState;
-            touchControls.userInteractionEnabled = !g_pendingMenuOpenState;
-            NSLog(@"[iOS View Integration]    Result: hidden=%d, userInteraction=%d",
-                  touchControls.hidden, touchControls.userInteractionEnabled);
-            g_hasPendingMenuState = false;
-        } else {
-            NSLog(@"[iOS View Integration] ℹ️ No pending state to apply");
-        }
-
-        NSLog(@"[iOS View Integration] 📊 Final touch controls state: hidden=%d, userInteraction=%d",
-              touchControls.hidden, touchControls.userInteractionEnabled);
+        NSLog(@"[iOS View Integration] Created touch controls overlay window");
+        NSLog(@"[iOS View Integration] Overlay window: %@", overlayWindow);
+        NSLog(@"[iOS View Integration] Touch controls container: %@", g_viewController.touchControlsContainer);
+        NSLog(@"[iOS View Integration] Touch controls hidden: %d", g_viewController.touchControlsContainer.hidden);
+        NSLog(@"[iOS View Integration] Overlay window isKeyWindow: %d", overlayWindow.isKeyWindow);
+        NSLog(@"[iOS View Integration] SDL window isKeyWindow: %d", uiWindow.isKeyWindow);
     } else {
-        NSLog(@"[iOS View Integration] ❌ Error: Touch controls container is null");
+        NSLog(@"[iOS View Integration] ❌ ERROR: Cannot create overlay window - no window scene available");
     }
 
-    // Store reference for the view controller (for compatibility)
-    g_viewController.overlayWindow = uiWindow;
-
-    NSLog(@"[iOS View Integration] Integration complete (single window mode)");
+    NSLog(@"[iOS View Integration] Integration complete");
 }
 
-void iOS_SetMenuOpen(bool menuOpen) {
-    // Single window approach: touch controls are a subview of SDL's view
-    // When menu opens: hide touch controls so ImGui can receive touches
-    // When menu closes: show touch controls again
+// Called when menu visibility changes - switches which window receives touch input
+// Menu OPEN: SDL window becomes key so ImGui can receive touch events
+// Menu CLOSED: Overlay window becomes key so game controls work
+extern "C" void iOS_SetMenuOpen(bool menuOpen) {
+    NSLog(@"[iOS View Integration] iOS_SetMenuOpen called with menuOpen=%d", menuOpen);
 
-    NSLog(@"[iOS Menu] 🔵 iOS_SetMenuOpen called with menuOpen=%d", menuOpen);
-    NSLog(@"[iOS Menu]    Before: g_pendingMenuOpenState=%d, g_hasPendingMenuState=%d",
-          g_pendingMenuOpenState, g_hasPendingMenuState);
-    NSLog(@"[iOS Menu]    g_touchControlsView exists: %d", g_touchControlsView != nil);
+    if (!g_sdlWindow || !g_viewController || !g_viewController.overlayWindow) {
+        NSLog(@"[iOS View Integration] Warning: Windows not initialized yet, cannot switch focus");
+        return;
+    }
 
-    // Always store the desired state
-    g_pendingMenuOpenState = menuOpen;
-    g_hasPendingMenuState = true;
+    UIWindow* overlayWindow = g_viewController.overlayWindow;
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        // Read the latest pending state (don't capture menuOpen parameter)
-        bool latestMenuOpenState = g_pendingMenuOpenState;
+        if (menuOpen) {
+            // Menu opening: SDL window needs to receive touches for ImGui
+            NSLog(@"[iOS View Integration] Menu OPEN - switching to SDL window for ImGui touch input");
 
-        NSLog(@"[iOS Menu] 🟢 Async block running, g_touchControlsView exists: %d", g_touchControlsView != nil);
-        NSLog(@"[iOS Menu]    Applying state: latestMenuOpenState=%d", latestMenuOpenState);
+            // Disable touch interaction on overlay so touches pass through to SDL window
+            overlayWindow.userInteractionEnabled = NO;
 
-        if (g_touchControlsView) {
-            // Simply hide/show the touch controls subview
-            // When hidden, touches pass through to SDL/ImGui automatically
-            g_touchControlsView.hidden = latestMenuOpenState;
-            g_touchControlsView.userInteractionEnabled = !latestMenuOpenState;
+            // Make SDL window key so it receives touch events
+            [g_sdlWindow makeKeyAndVisible];
 
-            NSLog(@"[iOS Menu] ✅ Applied state: hidden=%d, userInteraction=%d",
-                  g_touchControlsView.hidden, g_touchControlsView.userInteractionEnabled);
+            // Hide touch controls while menu is open
+            g_viewController.touchControlsContainer.hidden = YES;
 
-            // Clear pending state since we applied it
-            g_hasPendingMenuState = false;
-            NSLog(@"[iOS Menu]    Cleared pending state flag");
+            NSLog(@"[iOS View Integration] SDL window isKeyWindow: %d, overlay userInteraction: %d",
+                  g_sdlWindow.isKeyWindow, overlayWindow.userInteractionEnabled);
         } else {
-            NSLog(@"[iOS Menu] ⏳ Touch controls not yet created, keeping pending state: menuOpen=%d", latestMenuOpenState);
-        }
+            // Menu closing: Overlay needs to receive touches for game controls
+            NSLog(@"[iOS View Integration] Menu CLOSED - switching to overlay window for game controls");
 
-        // Also update the view controller's container reference if it exists
-        if (g_viewController.touchControlsContainer) {
-            g_viewController.touchControlsContainer.hidden = latestMenuOpenState;
-            g_viewController.touchControlsContainer.userInteractionEnabled = !latestMenuOpenState;
+            // Re-enable touch interaction on overlay
+            overlayWindow.userInteractionEnabled = YES;
+
+            // Make overlay window key so it receives touch events for game controls
+            [overlayWindow makeKeyAndVisible];
+
+            // Show touch controls
+            g_viewController.touchControlsContainer.hidden = NO;
+
+            NSLog(@"[iOS View Integration] Overlay window isKeyWindow: %d, userInteraction: %d",
+                  overlayWindow.isKeyWindow, overlayWindow.userInteractionEnabled);
         }
     });
 }
