@@ -26,18 +26,19 @@ echo "CMake version: $(cmake --version | head -1)"
 cd "$CI_PRIMARY_REPOSITORY_PATH"
 echo "Repository path: $CI_PRIMARY_REPOSITORY_PATH"
 
-# Generate Xcode project for iOS device
+# Generate Xcode project for iOS device at repo root
+# (ci_scripts must be next to .xcodeproj for Xcode Cloud to find it)
 echo "=== Generating Xcode project for iOS ==="
 cmake -G Xcode \
-    -B build-ios-device \
+    -B . \
     -DCMAKE_TOOLCHAIN_FILE=cmake/ios.toolchain.cmake \
     -DPLATFORM=OS64 \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
 
 echo "=== CMake generation complete ==="
-echo "Xcode project created at: build-ios-device/Starship.xcodeproj"
+echo "Xcode project created at: Starship.xcodeproj"
 
 # List the generated files
-ls -la build-ios-device/*.xcodeproj || true
+ls -la *.xcodeproj || true
 
 echo "=== Setup complete ==="
