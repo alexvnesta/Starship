@@ -135,6 +135,9 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
         ${CMAKE_CURRENT_SOURCE_DIR}/../ios/ViewIntegration.mm
         ${CMAKE_CURRENT_SOURCE_DIR}/../ios/AudioSessionHelper.h
         ${CMAKE_CURRENT_SOURCE_DIR}/../ios/AudioSessionHelper.mm
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/GameCenterManager.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/GameCenterManager.mm
+        ${CMAKE_CURRENT_SOURCE_DIR}/../ios/GameCenterBridge.mm
     )
 endif()
 
@@ -246,6 +249,12 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         find_library(UIKIT UIKit)
         if (UIKIT)
             target_link_libraries(libultraship PRIVATE ${UIKIT})
+        endif()
+
+        # GameKit framework for Game Center (leaderboards, achievements)
+        find_library(GAMEKIT GameKit)
+        if (GAMEKIT)
+            target_link_libraries(libultraship PRIVATE ${GAMEKIT})
         endif()
     endif()
 endif()

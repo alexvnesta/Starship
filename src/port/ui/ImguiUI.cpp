@@ -1360,6 +1360,53 @@ void GameMenuBar::DrawElement() {
                 TouchFriendlySliderFloat("Gyro Deadzone", "gGyroDeadzone", 0.0f, 5.0f, 0.5f, 0.25f);
                 TouchFriendlyCheckbox("Invert Gyro Pitch", "gGyroInvertPitch", true);
                 TouchFriendlyCheckbox("Invert Gyro Roll", "gGyroInvertRoll", true);
+
+                TouchFriendlySectionHeader("Game Center");
+                {
+                    // Game Center enable/disable toggle
+                    bool gcEnabled = iOS_GameCenterIsEnabled();
+                    bool gcAuthenticated = iOS_GameCenterIsAuthenticated();
+
+                    // Create toggle button for Game Center
+                    ImGui::PushStyleColor(ImGuiCol_Button, gcEnabled ? ImVec4(0.2f, 0.5f, 0.2f, 1.0f) : ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, gcEnabled ? ImVec4(0.3f, 0.6f, 0.3f, 1.0f) : ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+
+                    char gcButtonText[128];
+                    snprintf(gcButtonText, sizeof(gcButtonText), "Game Center               %s", gcEnabled ? "ON" : "OFF");
+
+                    if (TouchFriendlyButton(gcButtonText, ImVec2(buttonWidth, 50.0f))) {
+                        iOS_GameCenterSetEnabled(!gcEnabled);
+                    }
+                    ImGui::PopStyleColor(2);
+
+                    // Show status
+                    if (gcEnabled) {
+                        if (gcAuthenticated) {
+                            ImGui::TextColored(ImVec4(0.4f, 0.8f, 0.4f, 1.0f), "Status: Signed In");
+                        } else {
+                            ImGui::TextColored(ImVec4(0.9f, 0.6f, 0.3f, 1.0f), "Status: Not Signed In");
+
+                            // Sign in button
+                            if (TouchFriendlyButton("Sign In to Game Center", ImVec2(buttonWidth, 50.0f))) {
+                                iOS_GameCenterAuthenticate();
+                            }
+                        }
+
+                        ImGui::Spacing();
+
+                        // Show leaderboards/achievements buttons only if authenticated
+                        if (gcAuthenticated) {
+                            if (TouchFriendlyButton("View Leaderboards", ImVec2(buttonWidth, 50.0f))) {
+                                iOS_GameCenterShowLeaderboards();
+                            }
+                            if (TouchFriendlyButton("View Achievements", ImVec2(buttonWidth, 50.0f))) {
+                                iOS_GameCenterShowAchievements();
+                            }
+                        }
+                    } else {
+                        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Leaderboards and achievements disabled");
+                    }
+                }
                 break;
 
             case 2:  // Graphics tab

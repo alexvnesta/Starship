@@ -129,6 +129,103 @@ void iOS_IntegrateSDLView(void* sdlWindow);
  */
 void iOS_SetMenuOpen(bool menuOpen);
 
+// ============================================================================
+// Game Center Functions (Optional)
+// ============================================================================
+
+/**
+ * Check if Game Center is enabled by user preference
+ * @return true if Game Center is enabled
+ */
+bool iOS_GameCenterIsEnabled(void);
+
+/**
+ * Check if Game Center is authenticated (player signed in)
+ * @return true if player is authenticated with Game Center
+ */
+bool iOS_GameCenterIsAuthenticated(void);
+
+/**
+ * Enable or disable Game Center
+ * @param enabled true to enable, false to disable
+ */
+void iOS_GameCenterSetEnabled(bool enabled);
+
+/**
+ * Authenticate with Game Center
+ * Should be called early in app startup if Game Center is enabled
+ */
+void iOS_GameCenterAuthenticate(void);
+
+/**
+ * Submit a score to a leaderboard
+ * @param score The score value
+ * @param leaderboardID The leaderboard identifier (see GameCenterManager.h)
+ */
+void iOS_GameCenterSubmitScore(int64_t score, const char* leaderboardID);
+
+/**
+ * Unlock an achievement
+ * @param achievementID The achievement identifier (see GameCenterManager.h)
+ */
+void iOS_GameCenterUnlockAchievement(const char* achievementID);
+
+/**
+ * Report progress towards an achievement
+ * @param achievementID The achievement identifier
+ * @param percentComplete Progress from 0.0 to 100.0
+ */
+void iOS_GameCenterReportAchievementProgress(const char* achievementID, double percentComplete);
+
+/**
+ * Show the Game Center leaderboards UI
+ */
+void iOS_GameCenterShowLeaderboards(void);
+
+/**
+ * Show the Game Center achievements UI
+ */
+void iOS_GameCenterShowAchievements(void);
+
+/**
+ * Show the Game Center dashboard
+ */
+void iOS_GameCenterShowDashboard(void);
+
+// ============================================================================
+// Leaderboard ID Constants
+// ============================================================================
+
+#define IOS_LEADERBOARD_HIGH_SCORE    "com.starship.ios.leaderboard.highscore"
+#define IOS_LEADERBOARD_CORNERIA      "com.starship.ios.leaderboard.corneria"
+#define IOS_LEADERBOARD_METEO         "com.starship.ios.leaderboard.meteo"
+#define IOS_LEADERBOARD_FICHINA       "com.starship.ios.leaderboard.fichina"
+#define IOS_LEADERBOARD_SECTOR_X      "com.starship.ios.leaderboard.sectorx"
+#define IOS_LEADERBOARD_SECTOR_Y      "com.starship.ios.leaderboard.sectory"
+#define IOS_LEADERBOARD_SECTOR_Z      "com.starship.ios.leaderboard.sectorz"
+#define IOS_LEADERBOARD_TITANIA       "com.starship.ios.leaderboard.titania"
+#define IOS_LEADERBOARD_BOLSE         "com.starship.ios.leaderboard.bolse"
+#define IOS_LEADERBOARD_KATINA        "com.starship.ios.leaderboard.katina"
+#define IOS_LEADERBOARD_SOLAR         "com.starship.ios.leaderboard.solar"
+#define IOS_LEADERBOARD_MACBETH       "com.starship.ios.leaderboard.macbeth"
+#define IOS_LEADERBOARD_AREA6         "com.starship.ios.leaderboard.area6"
+#define IOS_LEADERBOARD_ZONESS        "com.starship.ios.leaderboard.zoness"
+#define IOS_LEADERBOARD_AQUAS         "com.starship.ios.leaderboard.aquas"
+#define IOS_LEADERBOARD_VENOM         "com.starship.ios.leaderboard.venom"
+
+// ============================================================================
+// Achievement ID Constants
+// ============================================================================
+
+#define IOS_ACHIEVEMENT_BEAT_CORNERIA   "com.starship.ios.achievement.beat_corneria"
+#define IOS_ACHIEVEMENT_BEAT_GAME       "com.starship.ios.achievement.beat_game"
+#define IOS_ACHIEVEMENT_MEDAL_CORNERIA  "com.starship.ios.achievement.medal_corneria"
+#define IOS_ACHIEVEMENT_ALL_MEDALS      "com.starship.ios.achievement.all_medals"
+#define IOS_ACHIEVEMENT_NO_DAMAGE       "com.starship.ios.achievement.no_damage"
+#define IOS_ACHIEVEMENT_ALL_PATHS       "com.starship.ios.achievement.all_paths"
+#define IOS_ACHIEVEMENT_BARREL_ROLL     "com.starship.ios.achievement.barrel_roll"
+#define IOS_ACHIEVEMENT_WINGMAN_SAVER   "com.starship.ios.achievement.wingman_saver"
+
 #ifdef __cplusplus
 }
 #endif
