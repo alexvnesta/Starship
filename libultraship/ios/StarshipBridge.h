@@ -9,6 +9,9 @@
 #ifndef StarshipBridge_h
 #define StarshipBridge_h
 
+#include <stddef.h>
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
