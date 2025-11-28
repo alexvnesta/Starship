@@ -26,6 +26,20 @@ fi
 
 echo "CMake version: $(cmake --version | head -1)"
 
+# Create placeholder asset files
+# The .o2r files are ROM-derived assets that can't be committed to the repo.
+# These placeholders allow CMake to configure and build to succeed.
+# For a working app, real assets must be provided separately.
+echo "=== Creating placeholder asset files ==="
+if [ ! -f "sf64.o2r" ]; then
+    echo "Creating placeholder sf64.o2r..."
+    touch sf64.o2r
+fi
+if [ ! -f "starship.o2r" ]; then
+    echo "Creating placeholder starship.o2r..."
+    touch starship.o2r
+fi
+
 # Generate Xcode project with CMake
 # This downloads all dependencies and creates the project
 echo "=== Running CMake to generate Xcode project ==="
