@@ -34,6 +34,7 @@ static bool g_needsClearNextFrame = false;  // Clear touch-down pos on NEXT fram
 
 // Touch scrolling state
 static ImVec2 g_scrollTouchDownPos = ImVec2(-1, -1);  // Touch-down position for scroll detection
+static ImVec2 g_lastTouchPos = ImVec2(-1, -1);  // Previous frame's touch position for real-time scroll
 static bool g_wasTouchingLastFrame = false;  // Track touch state changes manually
 static bool g_isDragging = false;
 static float g_scrollVelocity = 0.0f;
@@ -1253,6 +1254,9 @@ void GameMenuBar::DrawElement() {
         if (touchJustStarted) {
             // Touch just started - record position for scroll detection
             g_scrollTouchDownPos = io.MousePos;
+            g_lastTouchPos = io.MousePos;  // Initialize for real-time scrolling
+            g_scrollVelocity = 0.0f;  // Reset velocity
+            g_isDragging = false;
             SPDLOG_INFO("[iOS Scroll] Touch-down detected at ({:.0f}, {:.0f})", io.MousePos.x, io.MousePos.y);
         }
         if (touchJustEnded) {
@@ -1653,30 +1657,34 @@ void GameMenuBar::DrawElement() {
         }
 
         // Touch-based scrolling for iOS - MUST be inside child region to affect its scroll
-        // NOTE: SDL on iOS doesn't generate MOTION events during touch drag, only DOWN and UP.
-        // So we calculate scroll delta at touch-up time based on the full gesture distance.
+        // Real-time scrolling: content follows finger movement immediately
         float currentScrollY = ImGui::GetScrollY();
         float maxScrollY = ImGui::GetScrollMaxY();
 
-        // Detect scroll gesture on touch release
-        // A scroll gesture is when the finger moved more than TAP_TOLERANCE (50px)
-        // Uses touchJustEnded computed at start of frame
-        if (touchJustEnded && g_scrollTouchDownPos.x >= 0 && maxScrollY > 0) {
-            float deltaY = g_scrollTouchDownPos.y - io.MousePos.y;  // Positive = finger moved up = scroll down
-            float touchDistance = fabsf(deltaY);
+        // Real-time scroll during active touch
+        if (isTouchingNow && g_lastTouchPos.x >= 0 && maxScrollY > 0) {
+            float deltaY = g_lastTouchPos.y - io.MousePos.y;  // Positive = finger moved up = scroll down
 
-            const float TAP_TOLERANCE = 50.0f;
-            if (touchDistance >= TAP_TOLERANCE) {
-                // This was a scroll gesture, not a tap
-                // Apply the scroll delta (inverted: drag down = scroll up to show earlier content)
+            // Only scroll if finger actually moved (avoid tiny jitter)
+            if (fabsf(deltaY) > 0.5f) {
                 float newScroll = currentScrollY + deltaY;
                 newScroll = ImClamp(newScroll, 0.0f, maxScrollY);
                 ImGui::SetScrollY(newScroll);
-                g_scrollVelocity = deltaY * 0.3f;  // Initial momentum
+
+                // Track velocity using weighted average for smooth momentum
+                g_scrollVelocity = g_scrollVelocity * 0.6f + deltaY * 0.4f;
                 g_isDragging = true;
-                SPDLOG_INFO("[iOS Scroll] Scroll gesture: deltaY={:.0f}, newScroll={:.0f}, maxScroll={:.0f}",
-                    deltaY, newScroll, maxScrollY);
             }
+
+            // Update last position for next frame
+            g_lastTouchPos = io.MousePos;
+        }
+
+        // On touch release, continue with momentum scrolling
+        if (touchJustEnded) {
+            // Keep velocity for momentum, but reset tracking positions
+            g_lastTouchPos = ImVec2(-1, -1);
+            SPDLOG_INFO("[iOS Scroll] Touch ended, velocity={:.1f}", g_scrollVelocity);
         }
 
         // Apply momentum scrolling after gesture ends
@@ -1684,7 +1692,7 @@ void GameMenuBar::DrawElement() {
             float newScroll = currentScrollY + g_scrollVelocity;
             newScroll = ImClamp(newScroll, 0.0f, maxScrollY);
             ImGui::SetScrollY(newScroll);
-            g_scrollVelocity *= 0.92f;
+            g_scrollVelocity *= 0.92f;  // Decay momentum
         } else if (!io.MouseDown[0]) {
             g_scrollVelocity = 0.0f;
             g_isDragging = false;
