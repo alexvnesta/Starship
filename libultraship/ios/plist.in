@@ -53,11 +53,15 @@
 		<string>metal</string>
 	</array>
 
-	<!-- File Sharing -->
+	<!-- File Sharing - Allows users to access Documents folder via Files app -->
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+
+	<!-- Export Compliance - App does not use encryption -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 
 	<!-- Supported File Types for Import -->
 	<key>CFBundleDocumentTypes</key>
