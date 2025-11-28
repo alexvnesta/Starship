@@ -583,10 +583,10 @@ void GfxWindowBackendSDL3::HandleSingleEvent(SDL_Event& event) {
 #ifndef TARGET_WEB
         // Scancodes are broken in Emscripten SDL2: https://bugzilla.libsdl.org/show_bug.cgi?id=3259
         case SDL_EVENT_KEY_DOWN:
-            OnKeydown(event.key.key); // SDL3 changed keysym to key
+            OnKeydown(event.key.scancode); // SDL3: use scancode for physical key position
             break;
         case SDL_EVENT_KEY_UP:
-            OnKeyup(event.key.key); // SDL3 changed keysym to key
+            OnKeyup(event.key.scancode); // SDL3: use scancode for physical key position
             break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
             OnMouseButtonDown(event.button.button - 1);

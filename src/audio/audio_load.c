@@ -871,6 +871,24 @@ void AudioLoad_Init(void) {
     gSoundFontTable = SEGMENTED_TO_VIRTUAL(gSoundFontTableInit);
     gSampleBankTable = SEGMENTED_TO_VIRTUAL(gSampleBankTableInit);
     gSeqFontTable = SEGMENTED_TO_VIRTUAL(gSeqFontTableInit);
+
+    if (gSequenceTable == NULL) {
+        printf("ERROR: Failed to load audio sequence table from %s\n", gSeqTableInit);
+        return;
+    }
+    if (gSoundFontTable == NULL) {
+        printf("ERROR: Failed to load sound font table from %s\n", gSoundFontTableInit);
+        return;
+    }
+    if (gSampleBankTable == NULL) {
+        printf("ERROR: Failed to load sample bank table from %s\n", gSampleBankTableInit);
+        return;
+    }
+    if (gSeqFontTable == NULL) {
+        printf("ERROR: Failed to load seq font table from %s\n", gSeqFontTableInit);
+        return;
+    }
+
     gNumSequences = gSequenceTable->base.numEntries;
     numFonts = gSoundFontTable->base.numEntries;
 
