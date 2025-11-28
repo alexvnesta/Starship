@@ -70,6 +70,29 @@ void iOS_SetCameraState(int axis, float value);
  */
 bool iOS_ShowFilePicker(char* outPath, size_t pathSize);
 
+/**
+ * Import an O2R asset file from user selection
+ * Shows a file picker filtered for .o2r files, copies selected file to Documents
+ * @param filename Target filename (e.g., "sf64.o2r" or "starship.o2r")
+ * @return 0 on success, 1 if cancelled, -1 on error
+ */
+int iOS_ImportO2RFile(const char* filename);
+
+/**
+ * Check if an O2R file exists in the Documents directory
+ * @param filename The filename to check (e.g., "sf64.o2r")
+ * @return true if the file exists
+ */
+bool iOS_O2RFileExists(const char* filename);
+
+/**
+ * Get the Documents directory path
+ * @param outPath Buffer to store path (caller must provide buffer of at least 1024 bytes)
+ * @param pathSize Size of the output buffer
+ * @return true if path was retrieved successfully
+ */
+bool iOS_GetDocumentsPath(char* outPath, size_t pathSize);
+
 // ============================================================================
 // View Integration Functions
 // ============================================================================

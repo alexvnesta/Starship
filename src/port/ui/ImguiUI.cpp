@@ -1407,6 +1407,71 @@ void GameMenuBar::DrawElement() {
                         ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Leaderboards and achievements disabled");
                     }
                 }
+
+                TouchFriendlySectionHeader("Game Assets");
+                {
+                    // Show current status
+                    bool hasSf64 = iOS_O2RFileExists("sf64.o2r");
+                    bool hasStarship = iOS_O2RFileExists("starship.o2r");
+
+                    if (hasSf64) {
+                        ImGui::TextColored(ImVec4(0.4f, 0.8f, 0.4f, 1.0f), "sf64.o2r: Installed");
+                    } else {
+                        ImGui::TextColored(ImVec4(0.9f, 0.4f, 0.4f, 1.0f), "sf64.o2r: Not found");
+                    }
+
+                    if (hasStarship) {
+                        ImGui::TextColored(ImVec4(0.4f, 0.8f, 0.4f, 1.0f), "starship.o2r: Installed");
+                    } else {
+                        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "starship.o2r: Optional");
+                    }
+
+                    ImGui::Spacing();
+
+                    // Import buttons
+                    if (TouchFriendlyButton("Import sf64.o2r", ImVec2(buttonWidth, 50.0f))) {
+                        int result = iOS_ImportO2RFile("sf64.o2r");
+                        if (result == 0) {
+                            // Success - show message
+                            ImGui::OpenPopup("Asset Imported");
+                        } else if (result == -1) {
+                            ImGui::OpenPopup("Import Error");
+                        }
+                    }
+
+                    if (TouchFriendlyButton("Import starship.o2r", ImVec2(buttonWidth, 50.0f))) {
+                        int result = iOS_ImportO2RFile("starship.o2r");
+                        if (result == 0) {
+                            ImGui::OpenPopup("Asset Imported");
+                        } else if (result == -1) {
+                            ImGui::OpenPopup("Import Error");
+                        }
+                    }
+
+                    ImGui::Spacing();
+                    ImGui::TextWrapped("Generate .o2r files using the PC version, then transfer via AirDrop, Files, or cloud storage.");
+
+                    // Popup dialogs
+                    if (ImGui::BeginPopupModal("Asset Imported", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+                        ImGui::Text("Asset file imported successfully!");
+                        ImGui::Text("Please restart the app to load the new assets.");
+                        ImGui::Spacing();
+                        if (TouchFriendlyButton("OK", ImVec2(200, 50))) {
+                            ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::EndPopup();
+                    }
+
+                    if (ImGui::BeginPopupModal("Import Error", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+                        ImGui::Text("Failed to import asset file.");
+                        ImGui::Text("Please try again.");
+                        ImGui::Spacing();
+                        if (TouchFriendlyButton("OK", ImVec2(200, 50))) {
+                            ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::EndPopup();
+                    }
+                }
                 break;
 
             case 2:  // Graphics tab

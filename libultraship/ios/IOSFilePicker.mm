@@ -198,4 +198,107 @@ bool iOS_ShowFilePicker(char* outPath, size_t pathSize) {
     return result;
 }
 
+/**
+ * Get the Documents directory path
+ */
+bool iOS_GetDocumentsPath(char* outPath, size_t pathSize) {
+    if (!outPath || pathSize < 256) {
+        return false;
+    }
+
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    if (paths.count == 0) {
+        return false;
+    }
+
+    NSString *documentsPath = paths[0];
+    strncpy(outPath, [documentsPath UTF8String], pathSize - 1);
+    outPath[pathSize - 1] = '\0';
+    return true;
+}
+
+/**
+ * Check if an O2R file exists in the Documents directory
+ */
+bool iOS_O2RFileExists(const char* filename) {
+    if (!filename) {
+        return false;
+    }
+
+    char documentsPath[1024];
+    if (!iOS_GetDocumentsPath(documentsPath, sizeof(documentsPath))) {
+        return false;
+    }
+
+    NSString *fullPath = [NSString stringWithFormat:@"%s/%s", documentsPath, filename];
+    return [[NSFileManager defaultManager] fileExistsAtPath:fullPath];
+}
+
+/**
+ * Import an O2R file from user selection to Documents directory
+ * @return 0 on success, 1 if cancelled, -1 on error
+ */
+int iOS_ImportO2RFile(const char* filename) {
+    if (!filename) {
+        NSLog(@"[iOS O2R Import] Invalid filename");
+        return -1;
+    }
+
+    NSLog(@"[iOS O2R Import] Starting import for: %s", filename);
+
+    // Show file picker
+    char selectedPath[2048];
+    if (!iOS_ShowFilePicker(selectedPath, sizeof(selectedPath))) {
+        NSLog(@"[iOS O2R Import] User cancelled file selection");
+        return 1;  // Cancelled
+    }
+
+    NSLog(@"[iOS O2R Import] Selected file: %s", selectedPath);
+
+    // Check if the selected file has .o2r extension
+    NSString *sourcePath = [NSString stringWithUTF8String:selectedPath];
+    NSString *extension = [[sourcePath pathExtension] lowercaseString];
+
+    if (![extension isEqualToString:@"o2r"]) {
+        NSLog(@"[iOS O2R Import] Warning: Selected file is not an .o2r file (extension: %@)", extension);
+        // Still allow it - user might know what they're doing
+    }
+
+    // Get Documents directory
+    char documentsPath[1024];
+    if (!iOS_GetDocumentsPath(documentsPath, sizeof(documentsPath))) {
+        NSLog(@"[iOS O2R Import] Failed to get Documents path");
+        return -1;
+    }
+
+    NSString *destPath = [NSString stringWithFormat:@"%s/%s", documentsPath, filename];
+    NSLog(@"[iOS O2R Import] Destination: %@", destPath);
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSError *error = nil;
+
+    // Remove existing file if present
+    if ([fm fileExistsAtPath:destPath]) {
+        NSLog(@"[iOS O2R Import] Removing existing file at destination");
+        if (![fm removeItemAtPath:destPath error:&error]) {
+            NSLog(@"[iOS O2R Import] Failed to remove existing file: %@", error);
+            return -1;
+        }
+    }
+
+    // Copy the file
+    if (![fm copyItemAtPath:sourcePath toPath:destPath error:&error]) {
+        NSLog(@"[iOS O2R Import] Failed to copy file: %@", error);
+        return -1;
+    }
+
+    NSLog(@"[iOS O2R Import] Successfully imported %s", filename);
+
+    // Clean up security-scoped resource access
+    NSURL *sourceURL = [NSURL fileURLWithPath:sourcePath];
+    [sourceURL stopAccessingSecurityScopedResource];
+
+    return 0;  // Success
+}
+
 } // extern "C"
