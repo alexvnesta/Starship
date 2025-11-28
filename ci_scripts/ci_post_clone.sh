@@ -36,7 +36,8 @@ cmake -G Xcode \
     -DCMAKE_TOOLCHAIN_FILE=cmake/ios.toolchain.cmake \
     -DPLATFORM=OS64 \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
-    -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON
+    -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
 echo "✅ CMake configuration complete"
 echo "End time: $(date)"
