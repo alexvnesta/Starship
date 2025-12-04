@@ -15,7 +15,7 @@ This is an iOS port of Starship (Star Fox 64), forked from the Android port deve
 
 **Credits:**
 * Original Starship Team: [HarbourMasters/Starship](https://github.com/HarbourMasters/Starship) - Lead developers SonicDcer and Lywx
-* Android Port: This iOS port is based on the Android port foundation
+* Android Port: This iOS port is based on the Android port by ([@izzy2lost](https://github.com/izzy2lost))
 * iOS Port: Alex Nesta ([@alexvnesta](https://github.com/alexvnesta))
 
 ---
